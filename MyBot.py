@@ -2,7 +2,6 @@ from hlt import *
 from networking import *
 import logging
 import time
-import cPickle as pickle
 
 logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
@@ -57,23 +56,15 @@ def findStart(myID,gameMap):
 
 def findLocalMaxSmootherAttr(center,myID,gameMap,regionRadius=10):
     locs = getRegion(center.x,center.y,regionRadius,gameMap.height,gameMap.width)
-    attr_locs = [(gameMap.getSite(l).smoothedAttractiveness,l) for l in locs]
-    attr_locs.sort()
-    attr_locs.reverse()
-    return attr_locs[0][1]
+    attrs = [gameMap.getSite(l).smoothedAttractiveness for l in locs]
+    return locs[argsort(attrs,reverse=True)[0]]
 
-# def findBestDirections(locA,locB,gameMap):
-#     dirs = [0 for _ in range(5)]
-#     if abs(locB.x-locA.x) <= gameMap.width-abs(locB.x-locA.x):
-#         dirs[EAST]=1
-#     else:
-#         dirs[WEST]=1
-#     if abs(locB.y-locA.y) <= gameMap.height-abs(locB.y-locA.y):
-#         dirs[SOUTH]=1
-#     else:
-#         dirs[NORTH]=1
-#     return dirs
-epsilon = 0.05
+def argsort(seq,reverse=False):
+    #http://stackoverflow.com/questions/3382352/equivalent-of-numpy-argsort-in-basic-python/3382369#3382369
+    #by unutbu
+    return sorted(range(len(seq)), key=seq.__getitem__, reverse=reverse)
+
+epsilon = 0.000001
 
 def findBestDirections(locA,locB,gameMap):
     dirs = [epsilon for _ in range(5)]
@@ -112,39 +103,6 @@ def mapFinalDirections(gameMap):
             loc = Location(x,y)
             site = gameMap.getSite(loc)
             site.finalDirs = [a*b**2 for a,b in zip(site.globalDirs,site.localDirs)]
-
-# def mapFrontierDirections(gameMap):
-#     for y in range(gameMap.height):
-#         for x in range(gameMap.width):
-#             loc = Location(x,y)
-#             site = gameMap.getSite(loc)
-#             if site.dist_frontier is None or site.dist_frontier <= 0:
-#                 site.frontierDir = None
-#             else:
-#                 fmoves = [(gameMap.getSite(loc,d).dist_frontier,d) for d in CARDINALS]
-#                 random.shuffle()
-#                 site.frontierDir = min(fmoves)[1]
-
-def custom_min(x):
-    v_min = 999999
-    a_min = None
-    for v,a in x:
-        if v<v_min:
-            v_min = v
-            a_min = a
-    return a_min
-
-def mapFrontierDirections(gameMap):
-    for y in range(gameMap.height):
-        for x in range(gameMap.width):
-            loc = Location(x,y)
-            site = gameMap.getSite(loc)
-            if site.dist_frontier is None or site.dist_frontier <= 0:
-                site.frontierDir = None
-            else:
-                fmoves = [(gameMap.getSite(loc,d).dist_frontier,d) for d in CARDINALS]
-                random.shuffle(fmoves)  
-                site.frontierDir = custom_min(fmoves)
 
 def mapMoves(gameMap):
     for y in range(gameMap.height):
@@ -213,6 +171,8 @@ def find_frontier(myID,gameMap):
 def dist_frontier(frontier,myID,gameMap,dist=-1):
     if not frontier:
         return
+    if dist > 8:
+        return
     new_frontier = []
     for loc in frontier:
         for c in CARDINALS:
@@ -224,36 +184,37 @@ def dist_frontier(frontier,myID,gameMap,dist=-1):
             new_frontier.append(new_loc)
     dist_frontier(new_frontier,myID,gameMap,dist=dist+1)
 
+def custom_min(x):
+    v_min = 999999
+    a_min = None
+    for v,a in x:
+        if v<v_min:
+            v_min = v
+            a_min = a
+    return a_min
+
+def mapFrontierDirections(myID,gameMap,oldGameMap):
+    for y in range(gameMap.height):
+        for x in range(gameMap.width):
+            loc = Location(x,y)
+            site = gameMap.getSite(loc)
+            if site.owner == myID and site.dist_frontier is None:
+                site.dist_frontier = oldGameMap.getSite(loc).dist_frontier
+
+    for y in range(gameMap.height):
+        for x in range(gameMap.width):
+            loc = Location(x,y)
+            site = gameMap.getSite(loc)
+            if site.owner != myID or site.dist_frontier == 0:
+                site.frontierDir = None
+            else:
+                fmoves = [(gameMap.getSite(loc,d).dist_frontier,d) for d in CARDINALS]
+                random.shuffle(fmoves)  
+                site.frontierDir = custom_min(fmoves)
+
 def mapDistFrontier(myID,gameMap):
     frontier = find_frontier(myID,gameMap)
     dist_frontier(frontier,myID,gameMap)
-
-# def dist_frontier(loc,myID,gameMap):
-#     site = gameMap.getSite(loc)
-#     if site.owner != myID:
-#         return -1 if site.owner == 0 else -3
-#     if site.dist_frontier is not None and site.dist_frontier!=-10:
-#         return site.dist_frontier
-#     site.dist_frontier=-10
-#     values = [
-#             dist_frontier(gameMap.getLocation(loc,d),myID,gameMap) 
-#             for d in CARDINALS
-#             if gameMap.getSite(loc,d).dist_frontier != -10
-#         ]
-#     if len(values) == 0:
-#         site.dist_frontier = None
-#         return 999
-#     dist = min(values) + 1
-#     site.dist_frontier = dist
-#     return dist
-
-# def mapDistFrontier(myID,gameMap):
-#     for y in range(gameMap.height):
-#         for x in range(gameMap.width):
-#             loc = Location(x,y)
-#             if gameMap.getSite(loc).owner == myID and gameMap.getSite(loc).dist_frontier is None:
-#                 dist_frontier(loc,myID,gameMap)
-
 
 def str_attrMap(gameMap):
     chars = []
@@ -275,8 +236,6 @@ def str_moveMap(gameMap):
 
 if __name__ == "__main__":
     myID, gameMap = getInit()
-    with open('gameMap.p','wb') as f:
-        pickle.dump((myID,gameMap),f)
 
     mapAttractiveness(myID,gameMap)
     mapSmoothedAttractiveness(myID,gameMap,kernel=[1.5,1.5,1.5,1.5])
@@ -287,96 +246,58 @@ if __name__ == "__main__":
     mapGlobalDirections(target,gameMap)
     mapLocalDirections(gameMap)
     mapFinalDirections(gameMap)
+
+    frontier = find_frontier(myID,gameMap)
+    dist_frontier(frontier,myID,gameMap)
     # mapMoves(gameMap)
 
     logging.debug('\n'+str_attrMap(gameMap))
     logging.debug('\n START: ({},{})'.format(start.x,start.y))
     logging.debug('\n TARGET: ({},{})'.format(target.x,target.y))
-    # logging.debug('\n'+str_moveMap(gameMap))
 
     originGameMap = gameMap
-
-    # prodMap = []
-    # blurredProdMap = []
-    # for y in range(gameMap.height):
-    #     prodMapRow = []
-    #     blurredProdMapRow = []
-    #     for x in range(gameMap.width):
-    #         site = gameMap.getSite(Location(x, y))
-    #         blurredProd = site.production
-    #         for d in CARDINALS:
-    #             neighbour_site = gameMap.getSite(Location(x, y),d)
-    #             blurredProd += neighbour_site.production
-    #         prodMapRow.append(site.production)
-    #         blurredProdMapRow.append(blurredProd/5.)
-    #     prodMap.append(prodMapRow)
-    #     blurredProdMap.append(blurredProdMapRow)
+    oldGameMap = gameMap
 
     moves_lookup = {(x,y):-1 for x in range(gameMap.width) for y in range(gameMap.height)}
 
     sendInit("MaximoBot_v0.2")
 
     target_reached = False
-    # attack = False
     turn = 0
     while True:
         dtleaving = 0
         moves = []
         gameMap = getFrame()
-        if turn == 250:
-            with open('gameMap250.p','wb') as f:
-                pickle.dump((myID,gameMap),f)
-        if turn == 251:
-            with open('gameMap251.p','wb') as f:
-                pickle.dump((myID,gameMap),f)
+        # import cPickle as pickle
+        # pickle.dump((myID,gameMap),open("test.p",'wb'))
+        # raise Exception()
         t0 = time.time()
-        mapDistFrontier(myID,gameMap)
-        mapFrontierDirections(gameMap)
+        frontier = find_frontier(myID,gameMap)
         t1 = time.time()
+        dist_frontier(frontier,myID,gameMap)
+        t2 = time.time()
+        mapFrontierDirections(myID,gameMap,oldGameMap)
+        t3 = time.time()
         logging.debug("TURN: {}".format(turn))
+        logging.debug("dt1={:.5f}".format(t1-t0))
+        logging.debug("dt2={:.5f}".format(t2-t1))
+        logging.debug("dt3={:.5f}".format(t3-t2))
         for y in range(gameMap.height):
             for x in range(gameMap.width):
                 site = gameMap.getSite(Location(x, y))
-                # if target_reached and not attack:
-                #     #acquiring target
-                #     if site.owner not in (myID,0):
-                #         new_target = Location(x,y)
-                #         attack = True
-                #         dir1 = findBestDirections(target,new_target,gameMap)
-                #         dir2 = findBestDirections(start,new_target,gameMap)
-                #         # new_dirs = [a+b for a,b in zip(dir1,dir2)]
-                #         new_dirs = dir2
-                #         logging.debug('\n NEW TARGET: ({},{})'.format(new_target.x,new_target.y))
-                #         logging.debug('\n NEW DIRS:'+str(new_dirs))
 
                 originSite = originGameMap.getSite(Location(x, y))
                 if site.owner == myID:
                     if not target_reached and x == target.x and y == target.y:
                         target_reached = True
                     moved = False
-                    # if moves_lookup[(x,y)] != -1: 
-                    #     if site.strength>=5*site.production:
-                    #         moves.append(Move(Location(x, y), moves_lookup[(x,y)]))
-                    #         moved = True
-                    #     else:
-                    #         moves.append(Move(Location(x, y), STILL))
-                    #         moved = True
-                    #     continue
+
                     if not target_reached:
                         d = weightedChoice(DIRECTIONS,originSite.finalDirs)
-                    # elif not attack:
-                    #     d = weightedChoice(DIRECTIONS,extendDirs)
                     else:
                         if site.frontierDir is not None:
                             #inside
                             d = site.frontierDir
-                            # if site.strength>=5*site.production:
-                            #     moves.append(Move(Location(x, y), d))
-                            #     moved = True
-                            # else:
-                            #     moves.append(Move(Location(x, y), STILL))
-                            #     moved = True
-
                         else:
                             attr_dirs = [
                                 (originGameMap.getSite(Location(x,y),d).attractiveness,d)
@@ -393,31 +314,8 @@ if __name__ == "__main__":
                         moves.append(Move(Location(x, y), d))
                         moves_lookup[(x,y)] = d
                         moved = True
-                    # for d in originSite.moves:
-                    #     siteMove = gameMap.getSite(Location(x, y),d)
-                    #     if siteMove.owner == myID:
-                    #         continue
-                    #     if siteMove.strength >= site.strength:
-                    #         moves.append(Move(Location(x, y), STILL))
-                    #         moved = True
-                    #     else:
-                    #         moves.append(Move(Location(x, y), d))
-                    #         moves_lookup[(x,y)] = d
-                    #         moved = True
-                    # if not moved:
-                    #     moves.append(Move(Location(x, y), NORTH if bool(int(random.random() * 2)) else WEST))
-                    #     moved = True
-
-                    
-                    # if not moved:
-                    #     # moves.append(Move(Location(x, y), NORTH if bool(int(random.random() * 2)) else WEST))
-                    #     moves.append(Move(Location(x, y), STILL))
-                    #     moved = True
-                    # if not moved and site.strength<=15:
-                    #     moves.append(Move(Location(x, y), STILL))
-                    # elif not moved:
-                    #     moves.append(Move(Location(x, y), NORTH if bool(int(random.random() * 2)) else WEST))
-        t2 = time.time()
+        t4 = time.time()
         sendFrame(moves)
-        logging.debug("dt1={:.5f} dt2={:.5f}".format(t1-t0,t2-t1))
+        oldGameMap = gameMap
+        logging.debug("dt4={:.5f}".format(t4-t3))
         turn += 1

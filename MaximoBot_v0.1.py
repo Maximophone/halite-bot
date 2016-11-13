@@ -70,7 +70,7 @@ while True:
     t0 = time.time()
     # centroid = find_centroid(myID,gameMap)
     t1 = time.time()
-    logging.debug("TURN: {}".format(turn))
+    # logging.debug("TURN: {}".format(turn))
     # logging.debug("CENTROID: {},{}".format(centroid.x,centroid.y))
     for y in range(gameMap.height):
         for x in range(gameMap.width):
@@ -108,5 +108,5 @@ while True:
                 #     moves.append(Move(Location(x, y), NORTH if bool(int(random.random() * 2)) else WEST))
     t2 = time.time()
     sendFrame(moves)
-    logging.debug("dt1={:.5f} dt2={:.5f} dtleaving={:.5f}".format(t1-t0,t2-t1,dtleaving))
+    # logging.debug("dt1={:.5f} dt2={:.5f} dtleaving={:.5f}".format(t1-t0,t2-t1,dtleaving))
     turn += 1
