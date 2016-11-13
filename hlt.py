@@ -18,11 +18,18 @@ class Location:
     def __init__(self, x=0, y=0):
         self.x = x
         self.y = y
+    def rectify(self,h,w):
+        self.x %= h
+        self.y %= h
+        return self
+
 class Site:
     def __init__(self, owner=0, strength=0, production=0):
         self.owner = owner
         self.strength = strength
         self.production = production
+        self.dist_frontier = None
+
 class Move:
     def __init__(self, loc=0, direction=0):
         self.loc = loc

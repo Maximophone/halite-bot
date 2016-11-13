@@ -68,10 +68,10 @@ while True:
     moves = []
     gameMap = getFrame()
     t0 = time.time()
-    centroid = find_centroid(myID,gameMap)
+    # centroid = find_centroid(myID,gameMap)
     t1 = time.time()
     logging.debug("TURN: {}".format(turn))
-    logging.debug("CENTROID: {},{}".format(centroid.x,centroid.y))
+    # logging.debug("CENTROID: {},{}".format(centroid.x,centroid.y))
     for y in range(gameMap.height):
         for x in range(gameMap.width):
             site = gameMap.getSite(Location(x, y))
