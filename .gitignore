@@ -1,0 +1,5 @@
+halite
+*.pyc
+*.p
+*.zip
+.ipynb_checkpoints/
