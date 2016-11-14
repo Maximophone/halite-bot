@@ -64,6 +64,24 @@ def argsort(seq,reverse=False):
     #by unutbu
     return sorted(range(len(seq)), key=seq.__getitem__, reverse=reverse)
 
+def argmin(seq):
+    min_val = None
+    min_i = 0
+    for i,x in enumerate(seq):
+        if min_val is None or x < min_val:
+            min_val = x
+            min_i = i
+    return min_i
+
+def argmax(seq):
+    max_val = None
+    max_i = 0
+    for i,x in enumerate(seq):
+        if max_val is None or x > max_val:
+            max_val = x
+            max_i = i
+    return max_i
+
 epsilon = 0.000001
 
 def findBestDirections(locA,locB,gameMap):
@@ -233,6 +251,52 @@ def str_moveMap(gameMap):
             charsRow.append(str(gameMap.getSite(Location(x,y)).moves[0]))
         chars.append(charsRow)
     return '\n'.join([''.join(charsRow) for charsRow in chars])
+
+def reconstruct_path(came_from,node):
+    pass
+
+def cost(site):
+    return site.strength/float(site.production)
+
+def min_func(seq,function):
+
+
+def a_star(start,end,gameMap):
+    closed_set = set()
+    open_set = set([start])
+    came_from = {}
+    g_score = {}
+    g_score[start] = 0
+    f_score = {}
+    f_score[start] = gameMap.getDistance(start,end)
+
+    while open_set:
+        current = min(open_set,key=lambda x:f_score[x])
+
+        if current == end:
+            return reconstruct_path(came_from,current)
+        
+        open_set.remove(current)
+        closed_set.add(current)
+
+        for d in CARDINALS:
+            neighbor = gameMap.getLocation(current,d)
+            if neighbor in closed_set:
+                continue
+            site = gameMap.getSite(neighbor)
+            tentative_g_score = g_score[current] + cost(site)
+
+            if neighbor not in open_set:
+                open_set.add(neighbor)
+            elif tentative_g_score >= g_score[neighbor]:
+                continue
+
+            came_from[neighbor] = current
+            g_score[neighbor] = tentative_g_score
+            f_score[neighbor] = g_score[neighbor] + gameMap.getDistance(neighbor,end)
+
+    return False
+
 
 if __name__ == "__main__":
     myID, gameMap = getInit()
