@@ -8,8 +8,14 @@ EAST = 2
 SOUTH = 3
 WEST = 4
 
+NORTHEAST = 1.5
+SOUTHEAST = 2.5
+SOUTHWEST = 3.5
+NORTHWEST = 4.5
+
 DIRECTIONS = [a for a in range(0, 5)]
 CARDINALS = [a for a in range(1, 5)]
+HALFCARDINALS = [x/2. for x in range(2,10)]
 
 ATTACK = 0
 STOP_ATTACK = 1
@@ -31,6 +37,12 @@ class Location:
 
     def __ne__(self,other):
         return not self==other
+
+    def __str__(self):
+        return "loc({},{})".format(self.x,self.y)
+
+    def __repr__(self):
+        return str(self)
 
 class Site:
     def __init__(self, owner=0, strength=0, production=0):
@@ -106,6 +118,42 @@ class GameMap:
                     l.x = self.width - 1
                 else:
                     l.x -= 1
+            elif direction == NORTHEAST:
+                if l.x == self.width - 1:
+                    l.x = 0
+                else:
+                    l.x += 1
+                if l.y == 0:
+                    l.y = self.height - 1
+                else:
+                    l.y -= 1
+            elif direction == NORTHWEST:
+                if l.x == 0:
+                    l.x = self.width - 1
+                else:
+                    l.x -= 1
+                if l.y == 0:
+                    l.y = self.height - 1
+                else:
+                    l.y -= 1
+            elif direction == SOUTHEAST:
+                if l.x == self.width - 1:
+                    l.x = 0
+                else:
+                    l.x += 1
+                if l.y == self.height - 1:
+                    l.y = 0
+                else:
+                    l.y += 1
+            elif direction == SOUTHWEST:
+                if l.x == 0:
+                    l.x = self.width - 1
+                else:
+                    l.x -= 1
+                if l.y == self.height - 1:
+                    l.y = 0
+                else:
+                    l.y += 1
         return l
     def getSite(self, l, direction = STILL):
         l = self.getLocation(l, direction)

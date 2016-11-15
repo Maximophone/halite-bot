@@ -181,6 +181,8 @@ def dist_frontier(frontier,myID,gameMap,dist=-1):
             if site.owner!=myID or site.dist_frontier is not None:
                 continue
             site.dist_frontier = dist+1
+            if dist==-1 and gameMap.getSite(loc).strength>150:
+                site.dist_frontier+=1
             new_frontier.append(new_loc)
     dist_frontier(new_frontier,myID,gameMap,dist=dist+1)
 

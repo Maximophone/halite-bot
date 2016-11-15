@@ -44,6 +44,9 @@ def getGameMapStats(myID,gameMap):
             stats['n_owners'][site.owner] += 1
     return stats
 
+def getMinDistance(loc,locs,gameMap):
+    return min([gameMap.getDistance(l,loc) for l in locs])
+
 def weightedChoice(choices,weights):
     interval = sum(weights)
     x = random.random()*interval
@@ -247,7 +250,13 @@ def custom_min(x):
             a_min = a
     return a_min
 
-def mapFrontierDirections(myID,gameMap,oldGameMap):
+def directionDist(d1,d2):
+    return abs((d2-d1))%4
+
+def momentumChose(prev,moves):
+    return min(moves,key=lambda x:directionDist(x,prev))
+
+def mapFrontierDirections(myID,gameMap,oldGameMap,momentumMap):
     for y in range(gameMap.height):
         for x in range(gameMap.width):
             loc = Location(x,y)
@@ -262,9 +271,13 @@ def mapFrontierDirections(myID,gameMap,oldGameMap):
             if site.owner != myID or site.dist_frontier == 0:
                 site.frontierDir = None
             else:
-                fmoves = [(gameMap.getSite(loc,d).dist_frontier,d) for d in CARDINALS]
-                random.shuffle(fmoves)  
-                site.frontierDir = custom_min(fmoves)
+                # fmoves = [(gameMap.getSite(loc,d).dist_frontier,d) for d in CARDINALS]
+                # random.shuffle(fmoves)  
+                momentum = momentumMap[loc]
+                site.frontierDir = min(
+                    CARDINALS,
+                    key=lambda d:(gameMap.getSite(loc,d).dist_frontier,directionDist(d,momentum)))
+                # site.frontierDir = custom_min(fmoves)
 
 def mapDistFrontier(myID,gameMap):
     frontier = find_frontier(myID,gameMap)
@@ -364,6 +377,22 @@ def smooth_frontier(frontier,gameMap):
         new_frontier.append(new_loc)
     return new_frontier
 
+def order_frontier(frontier,gameMap):
+    not_visited_set = set(frontier)
+    visited_set = set()
+    current = frontier[0]
+    new_frontier = [current]
+    player_id = current.owner
+    while len(visited_set) < len(frontier):
+        not_visited_set.remove(current)
+        visited_set.add(current)
+        outsiders = None
+        neighbors = [] 
+        for hd in HALFCARDINALS:
+            loc = gameMap.getLocation(current,hd)
+            # if gameMap.getSite(loc).owner != 
+
+#TODO: keep track of previous moves to add momentum and prevent reverting
 
 def a_star(start,end,gameMap):
     closed_set = set()
@@ -403,16 +432,32 @@ def a_star(start,end,gameMap):
 
     return False
 
+momentumMap = {}
+
+def shouldMove(site,siteMove,myID):
+    if site.strength <= 5*site.production:
+        return False
+    if siteMove.strength > site.strength and siteMove.owner != myID:
+        return False
+    if siteMove.strength > site.strength and siteMove.strength + site.strength > 255 and siteMove.owner == myID:
+        return False
+    return True
 
 if __name__ == "__main__":
     myID, gameMap = getInit()
+    gameMapStats = getGameMapStats(myID,gameMap)
 
     mapAttractiveness(myID,gameMap)
     mapSmoothedAttractiveness(myID,gameMap,kernel=[1.5,1.5,1.5,1.5])
 
     start = findStart(myID,gameMap)
+    others_start = [findStart(player_id,gameMap) for player_id,n in enumerate(gameMapStats['n_owners']) if player_id not in (0,myID) and n>0]
+    logging.debug(others_start)
+    min_distance_to_others = getMinDistance(start,others_start,gameMap)
+    logging.debug(min_distance_to_others)
+    momentumMap[start] = STILL
     inner_frontier = [start]
-    target = findLocalMaxSmootherAttr(start,myID,gameMap,regionRadius=15)
+    target = findLocalMaxSmootherAttr(start,myID,gameMap,regionRadius=min_distance_to_others/2)
 
     directions_dict,path = a_star(target,start,gameMap)
 
@@ -439,6 +484,7 @@ if __name__ == "__main__":
     sendInit("AStarBot")
 
     early_stop = False
+    dumps = False
 
     target_reached = False
     turn = 0
@@ -449,7 +495,7 @@ if __name__ == "__main__":
         gameMap = getFrame()
         logging.debug("TURN: {}".format(turn))
         # import cPickle as pickle
-        # pickle.dump((myID,gameMap),open("test.p",'wb'))
+        if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
         # raise Exception()
         time_tracker.track()
         if not early_stop:
@@ -459,10 +505,10 @@ if __name__ == "__main__":
             dist_frontier(frontier,myID,gameMap)
         time_tracker.track("Map Frontier Distance")
         if not early_stop:
-            mapFrontierDirections(myID,gameMap,oldGameMap)
+            mapFrontierDirections(myID,gameMap,oldGameMap,momentumMap)
         time_tracker.track("Map Frontier Directions")
         inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
-        pickle.dump(inner_frontier,open("frontier{}.p".format(turn),'wb'))
+        if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
         time_tracker.track("Track Frontier")
         for y in range(gameMap.height):
             for x in range(gameMap.width):
@@ -491,13 +537,26 @@ if __name__ == "__main__":
 
                     siteMove = gameMap.getSite(loc,d)
                     # if siteMove.owner != myID:
-                    if not moved and (siteMove.strength > site.strength or site.strength<=5*site.production):
-                        moves.append(Move(loc, STILL))
-                        moved = True
-                    else:
+                    if not moved and shouldMove(site,siteMove,myID):
                         moves.append(Move(loc, d))
+                        momentumMap[gameMap.getLocation(loc,d)] = d
                         moves_lookup[(x,y)] = d
                         moved = True
+                    else:
+                        moves.append(Move(loc, STILL))
+                        momentumMap[loc] = STILL
+                        moved = True
+
+                    # if not moved and ((siteMove.strength > site.strength and siteMove.owner ) or site.strength<=5*site.production):
+                    #     moves.append(Move(loc, STILL))
+                    #     momentumMap[loc] = STILL
+                    #     moved = True
+
+                    # else:
+                    #     moves.append(Move(loc, d))
+                    #     momentumMap[gameMap.getLocation(loc,d)] = d
+                    #     moves_lookup[(x,y)] = d
+                    #     moved = True
         time_tracker.track("Main Loop")
         sendFrame(moves)
         oldGameMap = gameMap
