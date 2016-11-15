@@ -1,4 +1,4 @@
 #!/bin/bash
-# -s 3322392898 3226745512
+# -s 3322392898 3226745512 1170434583
 
-./halite -s 1170434583 -d "40 40" "python3 MyBot.py" "python3 MaximoBot_v0.1.py"
+./halite -s 537348495 -d "30 30" "python MyBot.py" "python MaximoBot_v0.2.py"

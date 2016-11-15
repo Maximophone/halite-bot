@@ -3,10 +3,46 @@ from networking import *
 import logging
 import time
 
+import cPickle as pickle
+
 logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
 
 alpha = 1.
+
+class TimeTracker(object):
+    def __init__(self):
+        self.last_time = None
+        self.dts = []
+        self.names = []
+
+    def track(self,name=None):
+        t = time.time()
+        if self.last_time is None:
+            self.last_time = t
+        else:
+            self.dts.append(t-self.last_time)
+            self.last_time = t
+            self.names.append(name)
+
+    def log(self,reset=True):
+        for i,(dt,name) in enumerate(zip(self.dts,self.names)):
+            logging.debug("dt{}({})={:.5f}".format(i,name,dt))
+        if reset:
+            self.last_time = None
+            self.dts = []
+            self.names = []
+
+def getGameMapStats(myID,gameMap):
+    total = float(gameMap.width*gameMap.height)
+    stats = {
+        'n_owners':[0]*10
+    }
+    for y in range(gameMap.height):
+        for x in range(gameMap.width):
+            site = gameMap.getSite(Location(x,y))
+            stats['n_owners'][site.owner] += 1
+    return stats
 
 def weightedChoice(choices,weights):
     interval = sum(weights)
@@ -252,19 +288,88 @@ def str_moveMap(gameMap):
         chars.append(charsRow)
     return '\n'.join([''.join(charsRow) for charsRow in chars])
 
-def reconstruct_path(came_from,node):
-    pass
+def reconstruct_path(came_from,current):
+    total_path = [current]
+    while current in came_from.keys():
+        current = came_from[current]
+        total_path.append(current)
+    return total_path
 
 def cost(site):
-    return site.strength/float(site.production)
+    return site.strength/float(site.production+1)
 
-def min_func(seq,function):
+def invert_direction(d):
+    return ((d-1) + 2)%4 + 1
+
+def is_frontier(loc,player_id):
+    site = gameMap.getSite(loc)
+    if site.owner == player_id:
+        return False
+    for d in CARDINALS:
+        if gameMap.getSite(loc,d).owner != player_id:
+            continue
+        else:
+            return True
+    return False
+
+def frontier_tracking(prev_frontier,myID,gameMap):
+    checked = set()
+    new_frontier = []
+    for loc in prev_frontier:
+        for d in DIRECTIONS:
+            neighbor = gameMap.getLocation(loc,d)
+            if neighbor not in checked:
+                checked.add(neighbor)
+                if is_frontier(neighbor,myID):
+                    new_frontier.append(neighbor)
+    return new_frontier
+
+def bounding_box_tracking(prev_bounding_box,frontier,myID,gameMap):
+    new_bounding_box = {
+        "max_x":prev_bounding_box["max_x"]-1,
+        "min_x":prev_bounding_box["min_x"]+1,
+        "max_y":prev_bounding_box["max_y"]-1,
+        "min_y":prev_bounding_box["min_y"]+1,
+    }
+    for loc in frontier:
+        if loc.x>new_bounding_box["max_x"]:
+            new_bounding_box["max_x"] = loc.x
+        if loc.x==prev:
+            pass
+
+
+def get_bounding_box(myID,gameMap):
+    for y in range(gameMap.height):
+        for x in range(gameMap.width):
+            pass
+
+def smooth_frontier(frontier,gameMap):
+    width = gameMap.width
+    height = gameMap.height
+    lf = len(frontier)
+    new_frontier = []
+    for i,loc in enumerate(frontier):
+        new_loc = Location(
+            round(
+                0.5*loc.x
+                + 0.2*(frontier[(i+1)%lf].x+frontier[(i-1)%lf].x)
+                + 0.05*(frontier[(i+2)%lf].x+frontier[(i-2)%lf].x)
+                )%width,
+            round(
+                0.5*loc.y
+                + 0.2*(frontier[(i+1)%lf].y+frontier[(i-1)%lf].y)
+                + 0.05*(frontier[(i+2)%lf].y+frontier[(i-2)%lf].y)
+                )%height,
+            )
+        new_frontier.append(new_loc)
+    return new_frontier
 
 
 def a_star(start,end,gameMap):
     closed_set = set()
     open_set = set([start])
     came_from = {}
+    directions_dict = {}
     g_score = {}
     g_score[start] = 0
     f_score = {}
@@ -274,7 +379,7 @@ def a_star(start,end,gameMap):
         current = min(open_set,key=lambda x:f_score[x])
 
         if current == end:
-            return reconstruct_path(came_from,current)
+            return {k:invert_direction(v) for k,v in directions_dict.items()}, reconstruct_path(came_from,current)
         
         open_set.remove(current)
         closed_set.add(current)
@@ -291,6 +396,7 @@ def a_star(start,end,gameMap):
             elif tentative_g_score >= g_score[neighbor]:
                 continue
 
+            directions_dict[neighbor] = d
             came_from[neighbor] = current
             g_score[neighbor] = tentative_g_score
             f_score[neighbor] = g_score[neighbor] + gameMap.getDistance(neighbor,end)
@@ -303,8 +409,14 @@ if __name__ == "__main__":
 
     mapAttractiveness(myID,gameMap)
     mapSmoothedAttractiveness(myID,gameMap,kernel=[1.5,1.5,1.5,1.5])
+
     start = findStart(myID,gameMap)
-    target = findLocalMaxSmootherAttr(start,myID,gameMap,regionRadius=9)
+    inner_frontier = [start]
+    target = findLocalMaxSmootherAttr(start,myID,gameMap,regionRadius=15)
+
+    directions_dict,path = a_star(target,start,gameMap)
+
+
     startDirs = findBestDirections(start,target,gameMap)
     extendDirs = [startDirs[0]] + [startDirs[-1]] + startDirs[1:-1]
     mapGlobalDirections(target,gameMap)
@@ -324,62 +436,70 @@ if __name__ == "__main__":
 
     moves_lookup = {(x,y):-1 for x in range(gameMap.width) for y in range(gameMap.height)}
 
-    sendInit("MaximoBot_v0.2")
+    sendInit("AStarBot")
+
+    early_stop = False
 
     target_reached = False
     turn = 0
+    time_tracker = TimeTracker()
     while True:
         dtleaving = 0
         moves = []
         gameMap = getFrame()
+        logging.debug("TURN: {}".format(turn))
         # import cPickle as pickle
         # pickle.dump((myID,gameMap),open("test.p",'wb'))
         # raise Exception()
-        t0 = time.time()
-        frontier = find_frontier(myID,gameMap)
-        t1 = time.time()
-        dist_frontier(frontier,myID,gameMap)
-        t2 = time.time()
-        mapFrontierDirections(myID,gameMap,oldGameMap)
-        t3 = time.time()
-        logging.debug("TURN: {}".format(turn))
-        logging.debug("dt1={:.5f}".format(t1-t0))
-        logging.debug("dt2={:.5f}".format(t2-t1))
-        logging.debug("dt3={:.5f}".format(t3-t2))
+        time_tracker.track()
+        if not early_stop:
+            frontier = find_frontier(myID,gameMap)
+        time_tracker.track("Find Frontier")
+        if not early_stop:
+            dist_frontier(frontier,myID,gameMap)
+        time_tracker.track("Map Frontier Distance")
+        if not early_stop:
+            mapFrontierDirections(myID,gameMap,oldGameMap)
+        time_tracker.track("Map Frontier Directions")
+        inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
+        pickle.dump(inner_frontier,open("frontier{}.p".format(turn),'wb'))
+        time_tracker.track("Track Frontier")
         for y in range(gameMap.height):
             for x in range(gameMap.width):
-                site = gameMap.getSite(Location(x, y))
+                loc = Location(x,y)
+                site = gameMap.getSite(loc)
 
-                originSite = originGameMap.getSite(Location(x, y))
+                originSite = originGameMap.getSite(loc)
                 if site.owner == myID:
                     if not target_reached and x == target.x and y == target.y:
                         target_reached = True
                     moved = False
 
                     if not target_reached:
-                        d = weightedChoice(DIRECTIONS,originSite.finalDirs)
+                        d = directions_dict[loc]
+                        # d = weightedChoice(DIRECTIONS,originSite.finalDirs)
                     else:
                         if site.frontierDir is not None:
                             #inside
                             d = site.frontierDir
                         else:
                             attr_dirs = [
-                                (originGameMap.getSite(Location(x,y),d).attractiveness,d)
+                                (originGameMap.getSite(loc,d).attractiveness,d)
                                 for d in CARDINALS
-                                if gameMap.getSite(Location(x,y),d).owner != myID]
+                                if gameMap.getSite(loc,d).owner != myID]
                             d = max(attr_dirs)[1]
 
-                    siteMove = gameMap.getSite(Location(x, y),d)
+                    siteMove = gameMap.getSite(loc,d)
                     # if siteMove.owner != myID:
                     if not moved and (siteMove.strength > site.strength or site.strength<=5*site.production):
-                        moves.append(Move(Location(x, y), STILL))
+                        moves.append(Move(loc, STILL))
                         moved = True
                     else:
-                        moves.append(Move(Location(x, y), d))
+                        moves.append(Move(loc, d))
                         moves_lookup[(x,y)] = d
                         moved = True
-        t4 = time.time()
+        time_tracker.track("Main Loop")
         sendFrame(moves)
         oldGameMap = gameMap
-        logging.debug("dt4={:.5f}".format(t4-t3))
+        time_tracker.log()
         turn += 1

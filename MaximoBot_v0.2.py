@@ -251,9 +251,9 @@ if __name__ == "__main__":
     dist_frontier(frontier,myID,gameMap)
     # mapMoves(gameMap)
 
-    logging.debug('\n'+str_attrMap(gameMap))
-    logging.debug('\n START: ({},{})'.format(start.x,start.y))
-    logging.debug('\n TARGET: ({},{})'.format(target.x,target.y))
+    # logging.debug('\n'+str_attrMap(gameMap))
+    # logging.debug('\n START: ({},{})'.format(start.x,start.y))
+    # logging.debug('\n TARGET: ({},{})'.format(target.x,target.y))
 
     originGameMap = gameMap
     oldGameMap = gameMap
@@ -261,6 +261,8 @@ if __name__ == "__main__":
     moves_lookup = {(x,y):-1 for x in range(gameMap.width) for y in range(gameMap.height)}
 
     sendInit("MaximoBot_v0.2")
+
+    early_stop = False
 
     target_reached = False
     turn = 0
@@ -272,16 +274,19 @@ if __name__ == "__main__":
         # pickle.dump((myID,gameMap),open("test.p",'wb'))
         # raise Exception()
         t0 = time.time()
-        frontier = find_frontier(myID,gameMap)
+        if not early_stop:
+            frontier = find_frontier(myID,gameMap)
         t1 = time.time()
-        dist_frontier(frontier,myID,gameMap)
+        if not early_stop:
+            dist_frontier(frontier,myID,gameMap)
         t2 = time.time()
-        mapFrontierDirections(myID,gameMap,oldGameMap)
+        if not early_stop:
+            mapFrontierDirections(myID,gameMap,oldGameMap)
         t3 = time.time()
-        logging.debug("TURN: {}".format(turn))
-        logging.debug("dt1={:.5f}".format(t1-t0))
-        logging.debug("dt2={:.5f}".format(t2-t1))
-        logging.debug("dt3={:.5f}".format(t3-t2))
+        # logging.debug("TURN: {}".format(turn))
+        # logging.debug("dt1={:.5f}".format(t1-t0))
+        # logging.debug("dt2={:.5f}".format(t2-t1))
+        # logging.debug("dt3={:.5f}".format(t3-t2))
         for y in range(gameMap.height):
             for x in range(gameMap.width):
                 site = gameMap.getSite(Location(x, y))
@@ -317,5 +322,5 @@ if __name__ == "__main__":
         t4 = time.time()
         sendFrame(moves)
         oldGameMap = gameMap
-        logging.debug("dt4={:.5f}".format(t4-t3))
+        # logging.debug("dt4={:.5f}".format(t4-t3))
         turn += 1
