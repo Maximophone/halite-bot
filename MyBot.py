@@ -225,7 +225,7 @@ def find_frontier(myID,gameMap):
                     break
     return frontier
                 
-def dist_frontier(frontier,myID,gameMap,dist=-1):
+def dist_frontier(frontier,myID,gameMap,dist=-1,penalty=1):
     if not frontier:
         return
     if dist > 8:
@@ -238,6 +238,8 @@ def dist_frontier(frontier,myID,gameMap,dist=-1):
             if site.owner!=myID or site.dist_frontier is not None:
                 continue
             site.dist_frontier = dist+1
+            if dist==-1 and gameMap.getSite(loc).strength>150:
+                site.dist_frontier+=penalty
             new_frontier.append(new_loc)
     dist_frontier(new_frontier,myID,gameMap,dist=dist+1)
 
@@ -499,7 +501,8 @@ if __name__ == "__main__":
         # raise Exception()
         time_tracker.track()
         if not early_stop:
-            frontier = find_frontier(myID,gameMap)
+            # frontier = find_frontier(myID,gameMap)
+            frontier = frontier_tracking(frontier,myID,gameMap)
         time_tracker.track("Find Frontier")
         if not early_stop:
             dist_frontier(frontier,myID,gameMap)
@@ -507,7 +510,7 @@ if __name__ == "__main__":
         if not early_stop:
             mapFrontierDirections(myID,gameMap,oldGameMap,momentumMap)
         time_tracker.track("Map Frontier Directions")
-        inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
+        # inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
         if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
         time_tracker.track("Track Frontier")
         for y in range(gameMap.height):
