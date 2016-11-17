@@ -3,7 +3,7 @@ from networking import *
 import logging
 import time
 
-import cPickle as pickle
+# import cPickle as pickle
 
 logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
@@ -81,6 +81,7 @@ def mapSmoothedAttractiveness(myID,gameMap,kernel):
 
 def getRegion(x,y,radius,height,width):
     locs = []
+    radius = int(radius)
     for a in range(-radius,radius+1):
         rb = radius - abs(a)
         for b in range(-rb,rb+1):
@@ -278,7 +279,9 @@ def mapFrontierDirections(myID,gameMap,oldGameMap,momentumMap):
                 momentum = momentumMap[loc]
                 site.frontierDir = min(
                     CARDINALS,
-                    key=lambda d:(gameMap.getSite(loc,d).dist_frontier,directionDist(d,momentum)))
+                    key=lambda d:(
+                        gameMap.getSite(loc,d).dist_frontier if gameMap.getSite(loc,d).dist_frontier is not None else 0,
+                        directionDist(d,momentum)))
                 # site.frontierDir = custom_min(fmoves)
 
 def mapDistFrontier(myID,gameMap):
@@ -486,7 +489,7 @@ if __name__ == "__main__":
     sendInit("AStarBot")
 
     early_stop = False
-    dumps = False
+    dumps = True
 
     target_reached = False
     turn = 0
@@ -497,7 +500,7 @@ if __name__ == "__main__":
         gameMap = getFrame()
         logging.debug("TURN: {}".format(turn))
         # import cPickle as pickle
-        if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
+        # if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
         # raise Exception()
         time_tracker.track()
         if not early_stop:
@@ -511,7 +514,7 @@ if __name__ == "__main__":
             mapFrontierDirections(myID,gameMap,oldGameMap,momentumMap)
         time_tracker.track("Map Frontier Directions")
         # inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
-        if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
+        # if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
         time_tracker.track("Track Frontier")
         for y in range(gameMap.height):
             for x in range(gameMap.width):
