@@ -3,7 +3,7 @@ from networking import *
 import logging
 import utils
 
-logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
+logging.basicConfig(filename='last_run.log',level=logging.CRITICAL)
 logging.debug('Hello')
 
 
@@ -12,6 +12,30 @@ def attractiveness(site):
 
 def attractiveness_start(site):
     return site.production/float(site.strength)
+
+def is_frontier(loc,player_id,locsites):
+    site = locsites[(loc,0)]
+    if site.owner == player_id:
+        return False
+    for d in CARDINALS:
+        if locsites[(loc,d)].owner != player_id:
+            continue
+        else:
+            return True
+    return False
+
+def frontier_tracking(prev_frontier,myID,locsmap_d,locsites):
+    checked = set()
+    new_frontier = []
+    for loc in prev_frontier:
+        for d in DIRECTIONS:
+            neighbor = locsmap_d[(loc,d)]
+            if neighbor not in checked:
+                checked.add(neighbor)
+                if is_frontier(neighbor,myID,locsites):
+                    new_frontier.append(neighbor)
+                    locsites[(neighbor,0)].is_frontier = True
+    return new_frontier
 
 def map_attractiveness(myID,gameMap,attr):
     for y in range(gameMap.height):
@@ -24,26 +48,26 @@ def map_attractiveness(myID,gameMap,attr):
                 site.attractiveness = attr(site)
             site.potential_attr = site.attractiveness
 
-def map_potential_attr(frontier,myID,gameMap,visited_set=None,decay=0.1):
+def map_potential_attr(frontier,myID,locsmap_d,locsites,visited_set=None,decay=0.1,nesting_level=0,max_nesting=6):
     if not frontier:
         return
     if visited_set is None:
         visited_set = frontier
     new_frontier = set()
     for loc in frontier:
-        site = gameMap.getSite(loc)
+        site = locsites[(loc,0)]
         for d in CARDINALS:
-            new_loc = gameMap.getLocation(loc,d)
-            new_site = gameMap.getSite(new_loc)
+            new_loc = locsmap_d[(loc,d)]
+            new_site = locsites[(new_loc,0)]
             if new_site.owner != myID or new_loc in visited_set:
                 continue
             new_site.potential_attr = max(site.potential_attr-decay,new_site.potential_attr)
             new_frontier.add(new_loc)
     visited_set.update(new_frontier)
-    map_potential_attr(new_frontier,myID,gameMap,visited_set=visited_set,decay=decay)
+    map_potential_attr(new_frontier,myID,locsmap_d,locsites,visited_set=visited_set,decay=decay,nesting_level=nesting_level+1,max_nesting=max_nesting)
 
-def attr_direction(loc,d,gameMap,momentumMap,momentumTerm=0.5):
-    potential = gameMap.getSite(loc,d).potential_attr
+def attr_direction(loc,d,locsites,momentumMap,momentumTerm=0.5):
+    potential = locsites[(loc,d)].potential_attr
     inv_d = utils.invert_direction(d)
     # if d == momentumMap[loc]:
     #     momentum = momentumTerm
@@ -53,17 +77,16 @@ def attr_direction(loc,d,gameMap,momentumMap,momentumTerm=0.5):
         momentum = 0.
     return potential + momentum
 
-def map_directions(myID,gameMap,momentumMap,momentumTerm=0.5):
+def map_directions(myID,locsmap,locsites,momentumMap,momentumTerm=0.5):
     for y in range(gameMap.height):
         for x in range(gameMap.width):
-            loc = Location(x,y)
-            site = gameMap.getSite(loc)
+            loc = locsmap[(x,y)]
+            site = locsites[(loc,0)]
             if site.owner!=myID:
                 site.direction=None
-                site.potential_direction=None
+                # site.potential_direction=None
                 continue
-            site.potential_direction = max(CARDINALS,key=lambda d:attr_direction(loc,d,gameMap,momentumMap,momentumTerm=0.))
-            site.direction = max(CARDINALS,key=lambda d:attr_direction(loc,d,gameMap,momentumMap,momentumTerm=momentumTerm))
+            site.direction = max(CARDINALS,key=lambda d:attr_direction(loc,d,locsites,momentumMap,momentumTerm=momentumTerm))
                 
 def shouldMove(site,siteMove,myID):
     if site.strength <= 5*site.production:
@@ -74,12 +97,12 @@ def shouldMove(site,siteMove,myID):
         return False
     return True
 
-def process_move(loc,d,myID,gameMap,momentumMap,moves):
-    site = gameMap.getSite(loc)
-    siteMove = gameMap.getSite(loc,d)
+def process_move(loc,d,myID,locsmap_d,locsites,momentumMap,moves):
+    site = locsites[(loc,0)]
+    siteMove = locsites[(loc,d)]
     if shouldMove(site,siteMove,myID):
         moves.append(Move(loc, d))
-        momentumMap[gameMap.getLocation(loc,d)] = d
+        momentumMap[locsmap_d[(loc,d)]] = d
     else:
         moves.append(Move(loc, STILL))
         momentumMap[loc] = STILL
@@ -103,6 +126,9 @@ if __name__ == "__main__":
     myID, gameMap = getInit()
 
     logging.debug("Init received")
+
+    locsmap = {(x,y):Location(x,y) for x in range(gameMap.width) for y in range(gameMap.height)}
+    locsmap_d = {(loc,d):gameMap.getLocation(loc,d) for loc in locsmap.values() for d in DIRECTIONS}
 
     gameMapStats = utils.getGameMapStats(myID,gameMap)
     logging.debug("Computed map stats")
@@ -137,13 +163,13 @@ if __name__ == "__main__":
     sendInit("SmartFrontierBot")
 
     logging.debug("Init sent")
-
+    
     decay = 0.5
     momentumTerm = 20.
     enemy_attr = 1. #0.5 works well too
 
     turn = 0
-    time_tracker = utils.TimeTracker()
+    time_tracker = utils.TimeTracker(logging)
     game_dumper = utils.Dumper('gameMap','smartfrontier',on=False)
 
     while True:
@@ -153,7 +179,10 @@ if __name__ == "__main__":
 
         time_tracker.track()
 
-        frontier = set(utils.frontier_tracking(frontier,myID,gameMap))
+        locsites = {(loc,d):gameMap.getSite(loc,d) for loc in locsmap.values() for d in DIRECTIONS}
+        time_tracker.track("Building access dictionaries")
+
+        frontier = set(frontier_tracking(frontier,myID,locsmap_d,locsites))
         time_tracker.track("Tracking frontier")
 
         map_attractiveness(myID,gameMap,attractiveness)
@@ -162,10 +191,10 @@ if __name__ == "__main__":
         adjust_frontier_potential(frontier,myID,gameMap,turn,enemy_attr=enemy_attr)
         time_tracker.track("Adjusting Frontier Potential Attr")
 
-        map_potential_attr(frontier,myID,gameMap,decay=decay)
+        map_potential_attr(frontier,myID,locsmap_d,locsites,decay=decay)
         time_tracker.track("Map Potential Attr")
 
-        map_directions(myID,gameMap,momentumMap,momentumTerm=momentumTerm)
+        map_directions(myID,locsmap,locsites,momentumMap,momentumTerm=momentumTerm)
         time_tracker.track("Map Directions")
 
         game_dumper.dump((myID,gameMap),turn)
@@ -173,8 +202,8 @@ if __name__ == "__main__":
         for y in range(gameMap.height):
             for x in range(gameMap.width):
 
-                loc = Location(x,y)
-                site = gameMap.getSite(loc)
+                loc = locsmap[(x,y)]
+                site = locsites[(loc,0)]
 
                 if site.owner == myID:
                     if not target_reached and target == loc:
@@ -184,9 +213,9 @@ if __name__ == "__main__":
                         chosen_d = directions_dict[loc]
                     else:
                         chosen_d = site.direction
-                    process_move(loc,chosen_d,myID,gameMap,momentumMap,moves)
+                    process_move(loc,chosen_d,myID,locsmap_d,locsites,momentumMap,moves)
 
         time_tracker.track("Processing other moves")
         sendFrame(moves)
-        time_tracker.log(logging)
+        time_tracker.log()
         turn += 1

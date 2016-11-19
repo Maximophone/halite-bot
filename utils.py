@@ -17,10 +17,12 @@ class Dumper(object):
                 cPickle.dump(obj,f)
 
 class TimeTracker(object):
-    def __init__(self):
+    def __init__(self,logging):
         self.last_time = None
         self.dts = []
         self.names = []
+        self.i=0
+        self.logging = logging
 
     def track(self,name=None):
         t = time.time()
@@ -28,16 +30,20 @@ class TimeTracker(object):
             self.last_time = t
         else:
             self.dts.append(t-self.last_time)
+            self.logging.debug("dt{}({})={:.5f}".format(self.i,name,t-self.last_time))
             self.last_time = t
             self.names.append(name)
+        self.i+=1
 
-    def log(self,logging,reset=True):
-        for i,(dt,name) in enumerate(zip(self.dts,self.names)):
-            logging.debug("dt{}({})={:.5f}".format(i,name,dt))
+    def log(self,reset=True):
+        # for i,(dt,name) in enumerate(zip(self.dts,self.names)):
+        #     logging.debug("dt{}({})={:.5f}".format(i,name,dt))
+        self.logging.debug("Total={:.5f}".format(sum(self.dts)))
         if reset:
             self.last_time = None
             self.dts = []
             self.names = []
+            self.i = 0
 
 def get_inner_frontier(frontier,myID,gameMap):
     inner_frontier = set()

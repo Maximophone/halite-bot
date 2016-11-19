@@ -5,7 +5,7 @@ import time
 
 from utils import Dumper
 
-logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
+logging.basicConfig(filename='last_run.log',level=logging.CRITICAL)
 logging.debug('Hello')
 
 alpha = 1.
