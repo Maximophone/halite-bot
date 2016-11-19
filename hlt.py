@@ -50,6 +50,15 @@ class Site:
         self.strength = strength
         self.production = production
         self.dist_frontier = None
+        self.is_frontier = None
+        self.is_inner_frontier = None
+
+
+    def __str__(self):
+        return "site(owner={},strength={},prod={})".format(self.owner,self.strength,self.production)
+
+    def __repr__(self):
+        return str(self)
 
 class Move:
     def __init__(self, loc=0, direction=0):

@@ -3,7 +3,7 @@ from networking import *
 import logging
 import time
 
-# import cPickle as pickle
+from utils import Dumper
 
 logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
@@ -489,7 +489,9 @@ if __name__ == "__main__":
     sendInit("AStarBot")
 
     early_stop = False
-    dumps = True
+    dumps = False
+    map_dumper = Dumper('gameMap','astarbot',on=dumps)
+    frontier_dumper = Dumper('frontier','astarbot',on=dumps)
 
     target_reached = False
     turn = 0
@@ -500,7 +502,6 @@ if __name__ == "__main__":
         gameMap = getFrame()
         logging.debug("TURN: {}".format(turn))
         # import cPickle as pickle
-        # if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
         # raise Exception()
         time_tracker.track()
         if not early_stop:
@@ -516,6 +517,8 @@ if __name__ == "__main__":
         # inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
         # if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
         time_tracker.track("Track Frontier")
+        # if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
+        map_dumper.dump((myID,gameMap),turn)
         for y in range(gameMap.height):
             for x in range(gameMap.width):
                 loc = Location(x,y)

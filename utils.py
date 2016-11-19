@@ -1,6 +1,21 @@
 import time
 from hlt import *
 
+class Dumper(object):
+
+    def __init__(self,name,botname,on=False):
+        self.folder = "dumps"
+        self.name = name
+        self.botname = botname
+        self.on = on
+
+    def dump(self,obj,turn):
+        if self.on:
+            import cPickle
+            filename = '{}/{}_{}_{}'.format(self.folder,self.name,self.botname,turn)
+            with open(filename,'wb') as f:
+                cPickle.dump(obj,f)
+
 class TimeTracker(object):
     def __init__(self):
         self.last_time = None
@@ -23,6 +38,29 @@ class TimeTracker(object):
             self.last_time = None
             self.dts = []
             self.names = []
+
+def get_inner_frontier(frontier,myID,gameMap):
+    inner_frontier = set()
+    for loc in frontier:
+        site = gameMap.getSite(loc)
+        for d in CARDINALS:
+            new_loc = gameMap.getLocation(loc,d)
+            new_site = gameMap.getSite(new_loc)
+            if new_site.owner != myID or new_loc in frontier:
+                continue
+            inner_frontier.add(new_loc)
+            new_site.is_inner_frontier = True
+    return inner_frontier
+
+def smooth_inner_frontier(frontier,myID,gameMap):
+    for loc in frontier:
+        neighbors_potential_attr = [gameMap.getSite(loc,d).potential_attr for d in HALFCARDINALS if gameMap.getLocation(loc,d) in frontier]
+        site = gameMap.getSite(loc)
+        all_potentials = [site.potential_attr]+neighbors_potential_attr
+        site.potential_attr_temp =  sum(all_potentials)/len(all_potentials)
+    for loc in frontier:
+        site = gameMap.getSite(loc)
+        site.potential_attr =  site.potential_attr_temp
 
 def getGameMapStats(myID,gameMap):
     total = float(gameMap.width*gameMap.height)
@@ -295,6 +333,8 @@ def reconstruct_path(came_from,current):
 
 
 def invert_direction(d):
+    if d==0:
+        return 0
     return ((d-1) + 2)%4 + 1
 
 def is_frontier(loc,player_id,gameMap):
@@ -318,6 +358,7 @@ def frontier_tracking(prev_frontier,myID,gameMap):
                 checked.add(neighbor)
                 if is_frontier(neighbor,myID,gameMap):
                     new_frontier.append(neighbor)
+                    gameMap.getSite(neighbor).is_frontier = True
     return new_frontier
 
 def bounding_box_tracking(prev_bounding_box,frontier,myID,gameMap):
@@ -375,7 +416,7 @@ def order_frontier(frontier,gameMap):
             loc = gameMap.getLocation(current,hd)
 
 
-def a_star(start,end,gameMap):
+def a_star(start,end,gameMap,cost):
     closed_set = set()
     open_set = set([start])
     came_from = {}
