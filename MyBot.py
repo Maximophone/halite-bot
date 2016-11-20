@@ -160,7 +160,7 @@ if __name__ == "__main__":
     directions_dict,path = utils.a_star(target,start,gameMap,cost)
     logging.debug("Found Path")
 
-    sendInit("SmartFrontierBot")
+    sendInit("SmartFrontierBot2")
 
     logging.debug("Init sent")
     
