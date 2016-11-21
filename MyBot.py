@@ -37,11 +37,9 @@ def frontier_tracking(prev_frontier,myID,locsmap_d,locsites):
                     locsites[(neighbor,0)].is_frontier = True
     return new_frontier
 
-def map_attractiveness(myID,gameMap,attr):
-    for y in range(gameMap.height):
-        for x in range(gameMap.width):
-            loc = Location(x,y)
-            site = gameMap.getSite(loc)
+def map_attractiveness(myID,locslist,locsites,attr):
+    for x,y,loc in locslist:
+            site = locsites[(loc,d)]
             if site.owner == myID:
                 site.attractiveness = -999
             else:
@@ -107,11 +105,11 @@ def process_move(loc,d,myID,locsmap_d,locsites,momentumMap,moves):
         moves.append(Move(loc, STILL))
         momentumMap[loc] = STILL
 
-def adjust_frontier_potential(frontier,myID,gameMap,turn,enemy_attr=1.):
+def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
     for loc in frontier:
-        site = gameMap.getSite(loc)
+        site = locsites[(loc,0)]
         for d in CARDINALS:
-            newsite = gameMap.getSite(loc,d)
+            newsite = locsites[(loc,d)]
             if newsite.owner not in (0,myID):
                 site.potential_attr += enemy_attr
 
@@ -127,8 +125,9 @@ if __name__ == "__main__":
 
     logging.debug("Init received")
 
+    locslist = [(x,y,Location(x,y)) for x in range(gameMap.width) for y in range(gameMap.height)]
     locsmap = {(x,y):Location(x,y) for x in range(gameMap.width) for y in range(gameMap.height)}
-    locsmap_d = {(loc,d):gameMap.getLocation(loc,d) for loc in locsmap.values() for d in DIRECTIONS}
+    locsmap_d = {(loc,d):gameMap.getLocation(loc,d) for x,y,loc in locslist for d in DIRECTIONS}
 
     gameMapStats = utils.getGameMapStats(myID,gameMap)
     logging.debug("Computed map stats")
@@ -188,7 +187,7 @@ if __name__ == "__main__":
         map_attractiveness(myID,gameMap,attractiveness)
         time_tracker.track("Map Attr")
 
-        adjust_frontier_potential(frontier,myID,gameMap,turn,enemy_attr=enemy_attr)
+        adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=enemy_attr)
         time_tracker.track("Adjusting Frontier Potential Attr")
 
         map_potential_attr(frontier,myID,locsmap_d,locsites,decay=decay)
