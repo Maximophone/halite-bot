@@ -53,7 +53,6 @@ class Site:
         self.is_frontier = None
         self.is_inner_frontier = None
 
-
     def __str__(self):
         return "site(owner={},strength={},prod={})".format(self.owner,self.strength,self.production)
 
@@ -65,11 +64,14 @@ class Move:
         self.loc = loc
         self.direction = direction
 
+_locscache = {}
+
 class GameMap:
     def __init__(self, width = 0, height = 0, numberOfPlayers = 0):
         self.width = width
         self.height = height
         self.contents = []
+        self._locsmap = None
 
         for y in range(0, self.height):
             row = []
@@ -105,6 +107,8 @@ class GameMap:
         return math.atan2(dy, dx)
 
     def getLocation(self, loc, direction):
+        if (loc,direction) in _locscache:
+            return _locscache[(loc,direction)]
         l = copy.deepcopy(loc)
         if direction != STILL:
             if direction == NORTH:
@@ -163,7 +167,9 @@ class GameMap:
                     l.y = 0
                 else:
                     l.y += 1
+        _locscache[(loc,direction)] = l
         return l
+
     def getSite(self, l, direction = STILL):
         l = self.getLocation(l, direction)
         return self.contents[l.y][l.x]
