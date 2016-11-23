@@ -52,6 +52,7 @@ class Site:
         self.dist_frontier = None
         self.is_frontier = None
         self.is_inner_frontier = None
+        self.enemy_detected = False
 
     def __str__(self):
         return "site(owner={},strength={},prod={})".format(self.owner,self.strength,self.production)

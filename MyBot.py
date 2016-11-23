@@ -150,10 +150,11 @@ def map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict=
         site = locsites[(loc,0)]
         if site.owner!=myID:
             site.direction=None
+            site.wanted_direction = None
             # site.potential_direction=None
             continue
         # logging.debug(loc)
-        if directions_dict is None:
+        if directions_dict is None or directions_dict.get(loc) is None:
             potential_directions = sorted(CARDINALS,reverse=True,key=lambda d:attr_direction(loc,d,locsites,momentumMap,momentumTerm=momentumTerm))[:1]
         else:
             # logging.debug("using directions dict")
@@ -162,6 +163,7 @@ def map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict=
             #     potential_directions = sorted(CARDINALS,reverse=True,key=lambda d:attr_direction(loc,d,locsites,momentumMap,momentumTerm=momentumTerm))[:1]
             # logging.debug(potential_directions)
         moved = False
+        site.wanted_direction = potential_directions[0]
         for d in potential_directions:
             new_loc = locsmap_d[(loc,d)]
             if shouldMove(loc,new_loc,map_uptodate,myID):
@@ -171,7 +173,7 @@ def map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict=
                 new_strength = map_uptodate[loc][0]+map_uptodate[new_loc][0] if map_uptodate[new_loc][2]==myID else map_uptodate[loc][0]-map_uptodate[new_loc][0]
                 map_uptodate[new_loc] = (new_strength,map_uptodate[new_loc][1],myID)
                 map_uptodate[loc] = (0,map_uptodate[loc][1],myID)
-                breaks
+                break
         if not moved:
             # logging.debug("should not move")
             site.direction = STILL
@@ -195,12 +197,15 @@ def map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict=
 def shouldMove(loc,new_loc,map_uptodate,myID):
     if map_uptodate[loc][0] <= 5*map_uptodate[loc][1]: 
     #if strength <= 5*production
+        # logging.debug("won't move because too small")
         return False
     if map_uptodate[new_loc][0] > map_uptodate[loc][0] and map_uptodate[new_loc][2] != myID: 
     #if foreign tile of superior strength
+        # logging.debug("wont move because would lose")
         return False
     if map_uptodate[new_loc][0] > map_uptodate[loc][0] and map_uptodate[new_loc][0] + map_uptodate[loc][0] > 255 and map_uptodate[new_loc][2] == myID:
     #if friendly tile and sum>255
+        # logging.debug("wont move because would exceed 255")
         return False
     return True
 
@@ -251,6 +256,9 @@ def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
         for loc in frontier:
             if not enemy_detected[loc]:
                 site.potential_attr = 0.
+            else:
+                logging.debug("enemy detected")
+                site.enemy_detected = True
 
 def cost(site):
     return site.strength/float(site.production+1)
@@ -303,9 +311,9 @@ if __name__ == "__main__":
 
     logging.debug("Init sent")
     
-    decay = 0.5
+    decay = 0.1
     momentumTerm = 1000.
-    enemy_attr = 0.5 #0.5 works well too
+    enemy_attr = 1. #0.5 works well too
 
     turn = 0
     time_tracker = utils.TimeTracker(logging)
@@ -346,6 +354,9 @@ if __name__ == "__main__":
         process_movelist(movelist,moves,momentumMap,locsmap_d)
 
         game_dumper.dump((myID,gameMap),turn)
+
+        if locsites[(target,0)].owner==myID:
+            target_reached = True
 
         # for y in range(gameMap.height):
         #     for x in range(gameMap.width):
