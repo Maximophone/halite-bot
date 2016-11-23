@@ -255,10 +255,10 @@ def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
     if sum(enemy_detected.values())>0:
         for loc in frontier:
             if not enemy_detected[loc]:
-                site.potential_attr = 0.
+                locsites[(loc,0)].potential_attr = 0.
             else:
                 logging.debug("enemy detected")
-                site.enemy_detected = True
+                locsites[(loc,0)].enemy_detected = True
 
 def cost(site):
     return site.strength/float(site.production+1)
