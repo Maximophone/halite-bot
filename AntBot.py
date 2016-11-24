@@ -65,7 +65,7 @@ if __name__ == "__main__":
     decay = 0.1
 
     turn = 0
-    time_tracker = TimeTracker()
+    time_tracker = TimeTracker(logging)
     while True:
         moves = []
         gameMap = getFrame()
@@ -111,5 +111,5 @@ if __name__ == "__main__":
 
         time_tracker.track("Processing other moves")
         sendFrame(moves)
-        time_tracker.log(logging)
+        time_tracker.log()
         turn += 1

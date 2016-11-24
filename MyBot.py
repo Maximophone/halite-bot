@@ -2,18 +2,21 @@ from hlt import *
 from networking import *
 import logging
 import utils
+import random
+
+random.seed(0)
 
 logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
 
 
-def attractiveness(site):
+def attractiveness_OLD(site):
     return (255.-site.strength)/255 + site.production/30.
 
-def attractiveness_OLD(site):
+def attractiveness(site):
     # if site.strength>180:
     #     return 0
-    return site.production/float(site.strength+1)
+    return site.production/float(site.strength) if site.strength else site.production
 
 def attractiveness_start(site):
     return site.production/float(site.strength)
@@ -247,6 +250,26 @@ def process_move_OLD(loc,d,myID,locsmap_d,locsites,momentumMap,moves):
         moves.append(Move(loc, STILL))
         momentumMap[loc] = STILL
 
+# available_dir = {
+#     1:(1,2,4),
+#     2:(1,2,3),
+#     3:(2,3,4),
+#     4:(1,3,4),
+#     0:(1,2,3,4)
+# }
+
+# def test_frontier_tile(loc,myID,locsites,enemy_attr,decay,depth,n_tries):
+#     final_average = 0
+#     multipliers = [(1-decay)**i for i in range(depth)]
+#     for _ in range(n_tries):
+#         visited = set()
+#         local_average = 0
+#         last_d = 0
+#         for m in multipliers:
+#             for 
+
+
+
 def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
     enemy_detected = {loc:False for loc in frontier}
     for loc in frontier:
@@ -311,7 +334,7 @@ if __name__ == "__main__":
     directions_dict,path = utils.a_star(target,start,gameMap,cost)
     logging.debug("Found Path")
 
-    sendInit("SmartFrontierBot2")
+    sendInit("ForwardFrontierBot")
 
     logging.debug("Init sent")
     
