@@ -252,13 +252,13 @@ def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
             if newsite.owner not in (0,myID):
                 enemy_detected[loc] = True
                 site.potential_attr += enemy_attr
-    if sum(enemy_detected.values())>0:
-        for loc in frontier:
-            if not enemy_detected[loc]:
-                locsites[(loc,0)].potential_attr = 0.
-            else:
-                logging.debug("enemy detected")
-                locsites[(loc,0)].enemy_detected = True
+    # if sum(enemy_detected.values())>0:
+    #     for loc in frontier:
+    #         if not enemy_detected[loc]:
+    #             locsites[(loc,0)].potential_attr = 0.
+    #         else:
+    #             logging.debug("enemy detected")
+    #             locsites[(loc,0)].enemy_detected = True
 
 def cost(site):
     return site.strength/float(site.production+1)
@@ -313,7 +313,7 @@ if __name__ == "__main__":
     
     decay = 0.1
     momentumTerm = 1000.
-    enemy_attr = 1. #0.5 works well too
+    enemy_attr = 0.4 #0.5 works well too
 
     turn = 0
     time_tracker = utils.TimeTracker(logging)
