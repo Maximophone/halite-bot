@@ -10,10 +10,10 @@ logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
 logging.debug('Hello')
 
 
-def attractiveness_OLD(site):
-    return (255.-site.strength)/255 + site.production/30.
-
 def attractiveness(site):
+    return ((255.-site.strength)/255 + site.production/30.)**2
+
+def attractiveness_OLD(site):
     # if site.strength>180:
     #     return 0
     return site.production/float(site.strength) if site.strength else site.production
@@ -202,7 +202,7 @@ def map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict=
 
 
 def shouldMove(loc,new_loc,map_old,map_uptodate,myID):
-    if map_old[loc][0] <= 5*map_old[loc][1]: 
+    if map_old[loc][0] <= 3*map_old[loc][1]: 
     #if strength <= 5*production
         # logging.debug("won't move because too small")
         return False
@@ -267,6 +267,24 @@ def process_move_OLD(loc,d,myID,locsmap_d,locsites,momentumMap,moves):
 #         last_d = 0
 #         for m in multipliers:
 #             for 
+def get_next_frontiers(frontier,n_new,locsmap_d,locsites,myID):
+    frontiers = [frontier]
+    current_frontier = frontier
+    for _ in range(n_new):
+        new_frontier = set()
+        for loc in frontier:
+            for d in CARDINALS:
+                new_loc = locsmap_d[(loc,d)]
+                site = locsites[(new_loc,0)]
+                if site.owner != myID and new_loc not in current_frontier:
+                    new_frontier.add(new_loc)
+        frontiers.append(new_frontier)
+        current_frontier = new_frontier
+    return frontiers
+
+def set_potential_frontiers(frontiers,locsmap_d,locsites,myID):
+    for frontier in frontiers[::-1]:
+        pass
 
 
 def get_surrounding_foreign(loc,radius,height,width,myID,locsmap,locsites):
@@ -277,18 +295,22 @@ def get_surrounding_foreign(loc,radius,height,width,myID,locsmap,locsites):
             new_region.add(rloc)
     return new_region
 
-def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,enemy_attr=1.):
+def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,enemy_attr=1.,exploration_factor=0.1):
     enemy_detected = {loc:False for loc in frontier}
-    for loc in frontier:
-        average_potential = 0
-        region = get_surrounding_foreign(loc,4,gameMap.height,gameMap.width,myID,locsmap,locsites)
-        len_region = float(len(region))
-        for rloc in region:
-            potential_attr = locsites[(rloc,0)].potential_attr
-            if locsites[(rloc,0)].owner not in (0,myID):
-                potential_attr += enemy_attr
-            average_potential += potential_attr/len_region
-        locsites[(loc,0)].potential_attr = average_potential
+    # for loc in frontier:
+    #     sum_potential = 0
+    #     region = get_surrounding_foreign(loc,5,gameMap.height,gameMap.width,myID,locsmap,locsites)
+    #     len_region = 0.
+    #     for rloc in region:
+    #         if rloc in frontier:
+    #             continue
+    #         len_region += 1.
+    #         potential_attr = locsites[(rloc,0)].potential_attr
+    #         if locsites[(rloc,0)].owner not in (0,myID):
+    #             potential_attr += enemy_attr*100
+    #         sum_potential += potential_attr
+    #     average_potential = sum_potential/len_region
+    #     locsites[(loc,0)].potential_attr += exploration_factor*average_potential
     for loc in frontier:
         site = locsites[(loc,0)]
         for d in CARDINALS:
@@ -395,11 +417,12 @@ if __name__ == "__main__":
             movelist = map_directions(myID,locslist,locsmap_d,locsites,momentumMap,directions_dict,momentumTerm=momentumTerm)
         time_tracker.track("Map Directions")
 
+
         process_movelist(movelist,moves,momentumMap,locsmap_d)
 
         game_dumper.dump((myID,gameMap),turn)
 
-        if locsites[(target,0)].owner==myID:
+        if locsites[(target,0)].owner!=0:
             target_reached = True
 
         # for y in range(gameMap.height):
