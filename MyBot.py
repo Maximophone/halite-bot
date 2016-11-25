@@ -269,9 +269,26 @@ def process_move_OLD(loc,d,myID,locsmap_d,locsites,momentumMap,moves):
 #             for 
 
 
+def get_surrounding_foreign(loc,radius,height,width,myID,locsmap,locsites):
+    region = utils.getRegion_new(loc.x,loc.y,radius,height,width,locsmap)
+    new_region = set()
+    for rloc in region:
+        if locsites[(rloc,0)].owner != myID:
+            new_region.add(rloc)
+    return new_region
 
-def adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=1.):
+def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,enemy_attr=1.):
     enemy_detected = {loc:False for loc in frontier}
+    for loc in frontier:
+        average_potential = 0
+        region = get_surrounding_foreign(loc,4,gameMap.height,gameMap.width,myID,locsmap,locsites)
+        len_region = float(len(region))
+        for rloc in region:
+            potential_attr = locsites[(rloc,0)].potential_attr
+            if locsites[(rloc,0)].owner not in (0,myID):
+                potential_attr += enemy_attr
+            average_potential += potential_attr/len_region
+        locsites[(loc,0)].potential_attr = average_potential
     for loc in frontier:
         site = locsites[(loc,0)]
         for d in CARDINALS:
@@ -366,7 +383,7 @@ if __name__ == "__main__":
         map_attractiveness(myID,locslist,locsites,attractiveness)
         time_tracker.track("Map Attr")
 
-        adjust_frontier_potential(frontier,myID,locsites,turn,enemy_attr=enemy_attr)
+        adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,enemy_attr=enemy_attr)
         time_tracker.track("Adjusting Frontier Potential Attr")
 
         map_potential(inner,frontier,locsites,decay=decay)

@@ -120,6 +120,16 @@ def getRegion(x,y,radius,height,width):
             locs.append(Location(x+a,y+b).rectify(height,width))
     return locs
 
+def getRegion_new(x,y,radius,height,width,locsmap):
+    locs = []
+    radius = int(radius)
+    for a in range(-radius,radius+1):
+        rb = radius - abs(a)
+        for b in range(-rb,rb+1):
+            locs.append(locsmap[((x+a)%width,(y+b)%height)])
+    return locs
+
+
 def findStart(myID,gameMap):
     for y in range(gameMap.height):
         for x in range(gameMap.width):
