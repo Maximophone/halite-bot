@@ -436,7 +436,7 @@ if __name__ == "__main__":
 
     turn = 0
     time_tracker = utils.TimeTracker(logging)
-    game_dumper = utils.Dumper('gameMap','forwardfrontier',on=True)
+    game_dumper = utils.Dumper('gameMap','forwardfrontier',on=False)
 
     while True:
 

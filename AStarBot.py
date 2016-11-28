@@ -501,8 +501,6 @@ if __name__ == "__main__":
         moves = []
         gameMap = getFrame()
         logging.debug("TURN: {}".format(turn))
-        # import cPickle as pickle
-        # raise Exception()
         time_tracker.track()
         if not early_stop:
             # frontier = find_frontier(myID,gameMap)
@@ -517,7 +515,6 @@ if __name__ == "__main__":
         # inner_frontier = frontier_tracking(inner_frontier,myID,gameMap)
         # if dumps: pickle.dump(inner_frontier,open("dumps/frontier{}.p".format(turn),'wb'))
         time_tracker.track("Track Frontier")
-        # if dumps: pickle.dump((myID,gameMap),open("dumps/gameMap{}.p".format(turn),'wb'))
         map_dumper.dump((myID,gameMap),turn)
         for y in range(gameMap.height):
             for x in range(gameMap.width):
