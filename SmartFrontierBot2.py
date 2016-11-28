@@ -3,7 +3,7 @@ from networking import *
 import logging
 import utils
 
-logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
+logging.basicConfig(filename='last_run.log',level=logging.CRITICAL)
 logging.debug('Hello')
 
 

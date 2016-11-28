@@ -310,7 +310,7 @@ def get_surrounding_foreign(loc,radius,height,width,myID,locsmap,locsites):
             new_region.add(rloc)
     return new_region
 
-def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,stats,enemy_attr=1.,exploration_factor=1.,radius=5,enemy_attr_far=2.):
+def adjust_frontier_potential_OLD(frontier,myID,locsmap,locsites,turn,stats,enemy_attr=1.,exploration_factor=1.,radius=5,enemy_attr_far=2.):
     enemy_detected = {loc:False for loc in frontier}
     for loc in frontier:
         sum_potential = 0
@@ -323,7 +323,7 @@ def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,stats,enemy_at
             potential_attr = locsites[(rloc,0)].potential_attr
             newsite = locsites[(rloc,0)]
             if newsite.owner not in (0,myID):
-                potential_attr += enemy_attr_far*get_smart_enemy_attr(myID,newsite.owner,stats) - 0.0
+                potential_attr += enemy_attr_far*get_smart_enemy_attr(myID,newsite.owner,stats)
             sum_potential += potential_attr
         average_potential = sum_potential/len_region if len_region else 0
         locsites[(loc,0)].potential_attr += exploration_factor*average_potential
@@ -335,7 +335,7 @@ def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,stats,enemy_at
                 enemy_detected[loc] = True
                 site.potential_attr += enemy_attr*get_smart_enemy_attr(myID,newsite.owner,stats)#*newsite.strength/255.
 
-def adjust_frontier_potential_OLD(frontier,myID,locsmap,locsites,turn,stats,enemy_attr=1.,exploration_factor=1.,radius=5,enemy_attr_far=2.):
+def adjust_frontier_potential(frontier,myID,locsmap,locsites,turn,stats,enemy_attr=1.,exploration_factor=1.,radius=5,enemy_attr_far=2.):
     enemy_detected = {loc:False for loc in frontier}
     for loc in frontier:
         sum_potential = 0
@@ -346,7 +346,7 @@ def adjust_frontier_potential_OLD(frontier,myID,locsmap,locsites,turn,stats,enem
             potential_attr = locsites[(rloc,0)].potential_attr if locsites[(rloc,0)].owner != myID else 0.
             newsite = locsites[(rloc,0)]
             if newsite.owner not in (0,myID):
-                potential_attr += enemy_attr_far*get_smart_enemy_attr(myID,newsite.owner,stats) - 0.15
+                potential_attr += enemy_attr_far*get_smart_enemy_attr(myID,newsite.owner,stats)
             sum_potential += potential_attr
         average_potential = sum_potential/len_region if len_region else 0
         locsites[(loc,0)].potential_attr += exploration_factor*average_potential
@@ -365,9 +365,10 @@ def adjust_frontier_potential_OLD(frontier,myID,locsmap,locsites,turn,stats,enem
     #             logging.debug("enemy detected")
     #             locsites[(loc,0)].enemy_detected = True
 def get_smart_enemy_attr(myID,enemyID,stats):
+    return 1.
     enemy_strength = stats['strength_owners'][enemyID]
     my_strength = stats['strength_owners'][myID]
-    return (enemy_strength/(my_strength+1.))
+    return (enemy_strength/(my_strength+1.))**2
 
 def get_smart_decay(myID,stats):
     return 1.
@@ -423,15 +424,15 @@ if __name__ == "__main__":
     directions_dict,path = utils.a_star(target,start,gameMap,cost)
     logging.debug("Found Path")
 
-    sendInit("ForwardFrontierBot2")
+    sendInit("ForwardFrontierBot")
 
     logging.debug("Init sent")
     
-    decay_factor = 0.05
+    decay_factor = 0.1
     momentumTerm = 1000.
-    enemy_attr = 0.2 #0.5 works well too
-    enemy_attr_far = 0.01
-    radius = 6
+    enemy_attr = 0.1 #0.5 works well too
+    enemy_attr_far = 0.2
+    radius = 4
 
     turn = 0
     time_tracker = utils.TimeTracker(logging)
