@@ -11,7 +11,10 @@ class Dumper(object):
 
     def dump(self,obj,turn):
         if self.on:
-            import _pickle
+            try:
+                import _pickle as _pickle
+            except ImportError:
+                import cPickle as _pickle
             filename = '{}/{}_{}_{}'.format(self.folder,self.name,self.botname,turn)
             with open(filename,'wb') as f:
                 _pickle.dump(obj,f)

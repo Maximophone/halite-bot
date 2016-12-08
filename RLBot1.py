@@ -24,6 +24,7 @@ from keras.optimizers import Adam
 sys.stdout, sys.stderr = stdout, stderr
 
 import numpy as np
+from utils2 import Dumper
 
 logging.debug("Imports done")
 
@@ -101,31 +102,31 @@ BATCH_SIZE = 64
 
 GAMMA = 0.99
 
-MAX_EPSILON = .1
+MAX_EPSILON = 1.
 MIN_EPSILON = 0.01
-LAMBDA = 0.001      # speed of decay
+LAMBDA = 0.0001      # speed of decay
 
 class Agent:
-    steps = 0
 
     def __init__(self, stateCnt, actionCnt, load_memory=False, load_brain=False, load_epsilon=True):
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
 
+
         self.brain = Brain(stateCnt, actionCnt, load=load_brain)
         self.memory = Memory(MEMORY_CAPACITY, load=load_memory)
         if load_epsilon:
             with open("epsilon_save","rb") as f:
-                self.epsilon = float(f.read())
+                self.steps,self.epsilon = [float(x) for x in f.read().split(',')]
         else:
-            self.epsilon = MAX_EPSILON
+            self.steps,self.epsilon = 0.,MAX_EPSILON
 
 
     def save(self):
         self.memory.save()
         self.brain.save()
         with open("epsilon_save","wb") as f:
-            f.write(str(self.epsilon))
+            f.write(str(self.steps)+','+str(self.epsilon))
         
     def act(self, s):
         if random.random() < self.epsilon:
@@ -174,14 +175,16 @@ def get_state(gamemap,my_id,square,dist):
     x0,y0 = square.x,square.y
     w,h = gamemap.width,gamemap.height
     arr = np.array([
-        (square.owner==my_id,
-            square.owner,
-            square.production,
-            square.strength) 
-        for square in gamemap]).reshape((h,w,4))
+            (
+                sq.owner==my_id,
+                (sq.owner!=0) & (sq.owner!=my_id),
+                sq.production,
+                sq.strength,
+            )
+            for sq in gamemap]).reshape((w,h,4))
     return np.take(np.take(arr,
-        np.arange(-dist,dist + 1)-y0,axis=0,mode='wrap'),
-        np.arange(-dist,dist + 1)-x0,axis=1,mode='wrap').flatten()
+        np.arange(-dist,dist + 1)+x0,axis=1,mode='wrap'),
+        np.arange(-dist,dist + 1)+y0,axis=0,mode='wrap').flatten()
 
 def compute_reward(gamemap,my_id):
     return sum([
@@ -215,7 +218,11 @@ class Environment:
         R = 0 
         done = False
 
+        dumper = Dumper('gamemap','rlbot1',on=True)
+
+        turn = 0
         while True:
+            dumper.dump((my_id,gamemap),turn)
             moves = []
             states = []
             actions = []
@@ -255,13 +262,14 @@ class Environment:
                 break
 
             agent.save()
+            turn+=1
 
         logging.debug("Total reward:", R)
 
 #-------------------- MAIN ----------------------------
 if __name__ == '__main__':
     
-    VISIBLE_DISTANCE = 1
+    VISIBLE_DISTANCE = 2
 
     env = Environment(visible_distance=VISIBLE_DISTANCE)
 
