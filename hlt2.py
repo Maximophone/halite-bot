@@ -9,15 +9,35 @@ communicating with the Halite game environment.
 
 import sys
 from collections import namedtuple
-from itertools import chain, zip_longest
-
+from itertools import chain
+try:
+    from itertools import zip_longest
+except ImportError:
+    def zip_longest(*args,**kwargs):
+        if "fillvalue" in kwargs:
+            fillvalue = kwargs["fillvalue"]
+        else:
+            fillvalue = None
+        while True:
+            ret = []
+            n_stopped = 0
+            for arg in args:
+                try:
+                    v = arg.next()
+                    ret.append(v)
+                except StopIteration:
+                    ret.append(fillvalue)
+                    n_stopped+=1
+            if n_stopped == len(args):
+                break
+            yield ret
 
 def grouper(iterable, n, fillvalue=None):
     "Collect data into fixed-length chunks or blocks"
     # grouper('ABCDEFG', 3, 'x') --> ABC DEF Gxx"
     args = [iter(iterable)] * n
     return zip_longest(*args, fillvalue=fillvalue)
-
+ 
 # Because Python uses zero-based indexing, the cardinal directions have a different mapping in this Python starterbot
 # framework than that used by the Halite game environment.  This simplifies code in several places.  To accommodate
 # this difference, the translation to the indexing system used by the game environment is done automatically by
