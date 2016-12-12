@@ -45,7 +45,7 @@ class Brain:
         model = Sequential()
 
         model.add(Dense(output_dim=64, activation='relu', input_dim=self.stateCnt))
-        model.add(Dense(output_dim=self.actionCnt, activation='softmax'))
+        model.add(Dense(output_dim=self.actionCnt, activation='linear'))
 
         opt = Adam(lr=0.00025)
         model.compile(loss='mse', optimizer=opt)
@@ -178,8 +178,8 @@ def get_state(gamemap,my_id,square,dist):
             (
                 sq.owner==my_id,
                 (sq.owner!=0) & (sq.owner!=my_id),
-                sq.production,
-                sq.strength,
+                sq.production/20.,
+                sq.strength/255.,
             )
             for sq in gamemap]).reshape((w,h,4))
     return np.take(np.take(arr,
