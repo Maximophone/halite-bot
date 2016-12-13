@@ -11,7 +11,7 @@ except ImportError:
     import _pickle as pickle
 
 random.seed(0)
-logging.basicConfig(filename='last_run.log',level=logging.DEBUG)
+logging.basicConfig(filename='rlbot.log.perm',level=logging.DEBUG)
 
 logging.debug("Start logging")
 
@@ -19,22 +19,27 @@ stdout, stderr = sys.stdout, sys.stderr
 
 sys.stdout, sys.stderr = open("fout","wb"), open("ferr","wb")
 from keras.models import Sequential
-from keras.layers import Dense
+from keras.layers import Dense, Flatten, Reshape
+from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import Adam
 sys.stdout, sys.stderr = stdout, stderr
 
 import numpy as np
 from utils2 import Dumper
 
+import signal
+
 logging.debug("Imports done")
 
-MEMORY_FILE = "memory_save"
-BRAIN_FILE = "brain_save"
+MEMORY_FILE = "memory_save_conv_3"
+BRAIN_FILE = "brain_save_conv_3"
+EPSILON_FILE = "epsilon_save_conv_3"
 
 class Brain:
-    def __init__(self, stateCnt, actionCnt,load=False):
+    def __init__(self, stateCnt, actionCnt,load=False, dim=None):
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
+        self.dim = dim
 
         self.model = self._createModel()
         if load:
@@ -44,7 +49,15 @@ class Brain:
     def _createModel(self):
         model = Sequential()
 
-        model.add(Dense(output_dim=64, activation='relu', input_dim=self.stateCnt))
+        model.add(Reshape(target_shape=dim, input_shape=(self.stateCnt,)))
+        model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+        model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
+        model.add(MaxPooling2D(pool_size=(2, 2)))
+
+        model.add(Flatten())
+        # model.add(Dense(16, 3, 3, border_mode='same', input_shape=dim))
+        model.add(Dense(output_dim=16, activation='relu'))
         model.add(Dense(output_dim=self.actionCnt, activation='linear'))
 
         opt = Adam(lr=0.00025)
@@ -97,35 +110,34 @@ class Memory:   # stored as ( s, a, r, s_ )
             self.samples = pickle.load(f)
 
 #-------------------- AGENT ---------------------------
-MEMORY_CAPACITY = 100000
+MEMORY_CAPACITY = 500000
 BATCH_SIZE = 64
 
 GAMMA = 0.99
 
 MAX_EPSILON = 1.
 MIN_EPSILON = 0.01
-LAMBDA = 0.0001      # speed of decay
+LAMBDA = 0.00008      # speed of decay
 
 class Agent:
 
-    def __init__(self, stateCnt, actionCnt, load_memory=False, load_brain=False, load_epsilon=True):
+    def __init__(self, stateCnt, actionCnt, load_memory=False, load_brain=False, load_epsilon=True, dim=None):
         self.stateCnt = stateCnt
         self.actionCnt = actionCnt
 
 
-        self.brain = Brain(stateCnt, actionCnt, load=load_brain)
+        self.brain = Brain(stateCnt, actionCnt, load=load_brain, dim=dim)
         self.memory = Memory(MEMORY_CAPACITY, load=load_memory)
         if load_epsilon:
-            with open("epsilon_save","rb") as f:
+            with open(EPSILON_FILE,"rb") as f:
                 self.steps,self.epsilon = [float(x) for x in f.read().split(',')]
         else:
             self.steps,self.epsilon = 0.,MAX_EPSILON
 
-
     def save(self):
         self.memory.save()
         self.brain.save()
-        with open("epsilon_save","wb") as f:
+        with open(EPSILON_FILE,"wb") as f:
             f.write(str(self.steps)+','+str(self.epsilon))
         
     def act(self, s):
@@ -191,13 +203,14 @@ def compute_reward(gamemap,my_id):
         square.strength/255. 
         for square 
         in gamemap 
-        if square.owner == my_id])
+        if square.owner == my_id])# * len([sq for sq in gamemap if sq.owner == my_id])
 
 #-------------------- ENVIRONMENT ---------------------
 class Environment:
     def __init__(self,visible_distance):
         self.visible_distance = visible_distance
         self.done = True
+        self.total_reward = 0
 
     def reset(self):
         self.done = False
@@ -239,9 +252,9 @@ class Environment:
 
                     moves.append(Move(square,a))
 
-            logging.debug("Actions: "+str(actions))
+            # logging.debug("Actions: "+str(actions))
             gamemap, r = self.step(gamemap,my_id,moves)
-            logging.debug("Reward: "+str(r))
+            # logging.debug("Reward: "+str(r))
 
             if done: # terminal state
                 s_ = None
@@ -256,25 +269,24 @@ class Environment:
             agent.replay()
 
             s = s_
-            R += r
+            self.total_reward += r
 
             if done:
                 break
 
-            agent.save()
+            # agent.save()
             turn+=1
-
-        logging.debug("Total reward:", R)
 
 #-------------------- MAIN ----------------------------
 if __name__ == '__main__':
     
-    VISIBLE_DISTANCE = 2
+    VISIBLE_DISTANCE = 4
 
     env = Environment(visible_distance=VISIBLE_DISTANCE)
 
     stateCnt  = (2*VISIBLE_DISTANCE+1)*(2*VISIBLE_DISTANCE+1)*4
     actionCnt = 5
+    dim = (2*VISIBLE_DISTANCE+1,2*VISIBLE_DISTANCE+1,4)
 
     logging.debug("Creating agent")
     agent = Agent(
@@ -282,7 +294,17 @@ if __name__ == '__main__':
         actionCnt,
         load_memory = os.path.isfile(MEMORY_FILE),
         load_brain = os.path.isfile(BRAIN_FILE),
-        load_epsilon = os.path.isfile("epsilon_save"))
+        load_epsilon = os.path.isfile(EPSILON_FILE),
+        dim = dim)
 
     logging.debug("Running")
+
+    def signal_term_handler(signal, frame):
+        logging.debug("Total Reward: {}".format(env.total_reward))
+        logging.debug("Saving agent")
+        agent.save()
+        sys.exit(0)
+     
+    signal.signal(signal.SIGTERM, signal_term_handler)
+
     env.run(agent)
