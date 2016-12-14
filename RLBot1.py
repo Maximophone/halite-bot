@@ -22,6 +22,7 @@ from keras.models import Sequential
 from keras.layers import Dense, Flatten, Reshape
 from keras.layers.convolutional import Convolution2D, MaxPooling2D
 from keras.optimizers import Adam
+import keras.backend as K
 sys.stdout, sys.stderr = stdout, stderr
 
 import numpy as np
@@ -29,11 +30,20 @@ from utils2 import Dumper
 
 import signal
 
+# import tensorflow as tf
+
+# def huber_loss(y_true, y_pred):
+#     return tf.reduce_sum(tf.sqrt(1 + tf.square(y_pred - y_true)) -1)
+
+def hubert_loss(y_true, y_pred):    # sqrt(1+a^2)-1
+    err = y_pred - y_true
+    return K.mean( K.sqrt(1+K.square(err))-1, axis=-1 )
+
 logging.debug("Imports done")
 
-MEMORY_FILE = "memory_save_conv_3"
-BRAIN_FILE = "brain_save_conv_3"
-EPSILON_FILE = "epsilon_save_conv_3"
+MEMORY_FILE = "memory_save_conv_7"
+BRAIN_FILE = "brain_save_conv_7"
+EPSILON_FILE = "epsilon_save_conv_7"
 
 class Brain:
     def __init__(self, stateCnt, actionCnt,load=False, dim=None):
@@ -42,6 +52,7 @@ class Brain:
         self.dim = dim
 
         self.model = self._createModel()
+        self.frozen_model = self._createModel()
         if load:
             self.load()
         # self.model.load_weights("cartpole-basic.h5")
@@ -49,26 +60,30 @@ class Brain:
     def _createModel(self):
         model = Sequential()
 
-        model.add(Reshape(target_shape=dim, input_shape=(self.stateCnt,)))
-        model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
-        model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
-        model.add(MaxPooling2D(pool_size=(2, 2)))
+        # model.add(Reshape(target_shape=dim, input_shape=(self.stateCnt,)))
+        # model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
+        # model.add(MaxPooling2D(pool_size=(2, 2)))
+        # model.add(Convolution2D(1, 3, 3, activation="relu", border_mode='same'))
+        # model.add(MaxPooling2D(pool_size=(2, 2)))
 
-        model.add(Flatten())
+        # model.add(Flatten())
         # model.add(Dense(16, 3, 3, border_mode='same', input_shape=dim))
-        model.add(Dense(output_dim=16, activation='relu'))
+        model.add(Dense(output_dim=64, activation='relu', input_shape=(self.stateCnt,)))
+        model.add(Dense(output_dim=64, activation='relu'))
+        model.add(Dense(output_dim=64, activation='relu'))
         model.add(Dense(output_dim=self.actionCnt, activation='linear'))
 
-        opt = Adam(lr=0.00025)
-        model.compile(loss='mse', optimizer=opt)
+        # opt = Adam(lr=0.00025)
+        model.compile(loss=hubert_loss, optimizer='nadam')
 
         return model
 
     def train(self, x, y, epoch=1, verbose=0):
         self.model.fit(x, y, batch_size=64, nb_epoch=epoch, verbose=verbose)
 
-    def predict(self, s):
+    def predict(self, s, frozen=False):
+        if frozen:
+            return self.frozen_model.predict(s)
         return self.model.predict(s)
 
     def predictOne(self, s):
@@ -79,6 +94,7 @@ class Brain:
 
     def load(self):
         self.model.load_weights(BRAIN_FILE)
+        self.frozen_model.load_weights(BRAIN_FILE)
 
 
 
@@ -163,7 +179,7 @@ class Agent:
         states_ = np.array([ (no_state if o[3] is None else o[3]) for o in batch ])
 
         p = agent.brain.predict(states)
-        p_ = agent.brain.predict(states_)
+        p_ = agent.brain.predict(states_, frozen=True)
 
         x = np.zeros((batchLen, self.stateCnt))
         y = np.zeros((batchLen, self.actionCnt))
@@ -200,7 +216,7 @@ def get_state(gamemap,my_id,square,dist):
 
 def compute_reward(gamemap,my_id):
     return sum([
-        square.strength/255. 
+        square.production/20. 
         for square 
         in gamemap 
         if square.owner == my_id])# * len([sq for sq in gamemap if sq.owner == my_id])
@@ -240,6 +256,7 @@ class Environment:
             states = []
             actions = []
             squares = []
+            move_blocked = False
             for square in gamemap:
                 if square.owner==my_id:
                     squares.append(square)
@@ -250,7 +267,11 @@ class Environment:
                     a = agent.act(s)
                     actions.append(a)
 
+                    # if should_move(square,a,gamemap):
                     moves.append(Move(square,a))
+                    # else:
+                    #     moves.append(Move(square,STILL))
+                    #     move_blocked = True
 
             # logging.debug("Actions: "+str(actions))
             gamemap, r = self.step(gamemap,my_id,moves)
@@ -264,6 +285,7 @@ class Environment:
                     s_ = None
                 else:
                     s_ = get_state(gamemap,my_id,square,dist)
+                # if not move_blocked:
                 agent.observe( (s, a, r, s_) )
             
             agent.replay()
@@ -277,6 +299,13 @@ class Environment:
             # agent.save()
             turn+=1
 
+def should_move(square,d,gamemap):
+    if square.strength <= 6*square.production:
+        return False
+    new_square = gamemap.get_target(square,d)
+    if square.strength < new_square.strength:
+        return False
+    return True
 #-------------------- MAIN ----------------------------
 if __name__ == '__main__':
     
