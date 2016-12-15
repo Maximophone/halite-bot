@@ -10,6 +10,8 @@ try:
 except ImportError:
     import _pickle as pickle
 
+os.environ["TF_CPP_MIN_LOG_LEVEL"]="2"
+
 random.seed(0)
 logging.basicConfig(filename='rlbot.log.perm',level=logging.DEBUG)
 
@@ -41,9 +43,9 @@ def hubert_loss(y_true, y_pred):    # sqrt(1+a^2)-1
 
 logging.debug("Imports done")
 
-MEMORY_FILE = "memory_save_conv_7"
-BRAIN_FILE = "brain_save_conv_7"
-EPSILON_FILE = "epsilon_save_conv_7"
+MEMORY_FILE = "memory_save_conv_10"
+BRAIN_FILE = "brain_save_conv_10"
+EPSILON_FILE = "epsilon_save_conv_10"
 
 class Brain:
     def __init__(self, stateCnt, actionCnt,load=False, dim=None):
@@ -68,9 +70,9 @@ class Brain:
 
         # model.add(Flatten())
         # model.add(Dense(16, 3, 3, border_mode='same', input_shape=dim))
-        model.add(Dense(output_dim=64, activation='relu', input_shape=(self.stateCnt,)))
-        model.add(Dense(output_dim=64, activation='relu'))
-        model.add(Dense(output_dim=64, activation='relu'))
+        model.add(Dense(output_dim=512, activation='relu', input_shape=(self.stateCnt,)))
+        model.add(Dense(output_dim=512, activation='relu'))
+        model.add(Dense(output_dim=512, activation='relu'))
         model.add(Dense(output_dim=self.actionCnt, activation='linear'))
 
         # opt = Adam(lr=0.00025)
@@ -179,7 +181,8 @@ class Agent:
         states_ = np.array([ (no_state if o[3] is None else o[3]) for o in batch ])
 
         p = agent.brain.predict(states)
-        p_ = agent.brain.predict(states_, frozen=True)
+        p_ = agent.brain.predict(states_)
+        pTarget_ = agent.brain.predict(states_, frozen=True)
 
         x = np.zeros((batchLen, self.stateCnt))
         y = np.zeros((batchLen, self.actionCnt))
@@ -193,6 +196,7 @@ class Agent:
                 t[a] = r
             else:
                 t[a] = r + GAMMA * np.amax(p_[i])
+                t[a] = r + GAMMA * pTarget_[i][ np.argmax(p_[i]) ]
 
             x[i] = s
             y[i] = t
