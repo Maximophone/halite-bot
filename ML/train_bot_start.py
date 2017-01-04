@@ -21,14 +21,14 @@ from mlutils import get_frames,center_frame,get_centroid_1D,get_centroid
 #     tf.train.SummaryWriter = tf.summary.FileWriter
 
 REPLAY_FOLDER = sys.argv[1]
-input_shape = (51,51)
+input_shape = (15,15)
 
 training_input = []
 training_target = []
 
 np.random.seed(0)
 
-MODEL_FILE = "model_0.h5"
+MODEL_FILE = "model_start_1.h5"
 
 if os.path.isfile(MODEL_FILE):
     model = load_model(MODEL_FILE)
@@ -46,10 +46,9 @@ else:
 
 
 n_replays = len(os.listdir(REPLAY_FOLDER))
-print('Loading')
 for i,replay_name in enumerate(os.listdir(REPLAY_FOLDER)):
-    # if i<=450 or i>600:
-    #     continue
+    if i>600:
+        break
     if replay_name[-4:]!='.hlt':continue
     print('Loading {}/{}'.format(i+1,n_replays))
     replay = json.load(open('{}/{}'.format(REPLAY_FOLDER,replay_name)))
@@ -60,12 +59,12 @@ for i,replay_name in enumerate(os.listdir(REPLAY_FOLDER)):
     players,counts = np.unique(player[-1],return_counts=True)
     target_id = players[counts.argmax()]
     if target_id == 0: continue
-    if 'nmalaguti' not in replay['player_names'][target_id-1].lower():
-        print "not using replay..."
-        continue
-    print "using replay"
+    # if 'erdman' not in replay['player_names'][target_id-1].lower():
+    #     continue
+    n_max = min(len(replay['frames']),20)
+    frames = frames[:n_max]
 
-    moves = np.array(replay['moves'])
+    moves = np.array(replay['moves'])[:n_max-1]
 
     is_player = frames[:,:,:,0]==target_id
     filtered_moves = np.where(is_player[:-1],moves,np.zeros_like(moves))
@@ -87,8 +86,6 @@ for i,replay_name in enumerate(os.listdir(REPLAY_FOLDER)):
         wmoves = center_frame(move,centroid,wrap_size=input_shape)
         training_input.append(wframe)
         training_target.append(wmoves)
-
-print('Loaded')
 
 now = datetime.datetime.now()
 tensorboard = TensorBoard(log_dir='./logs/'+now.strftime('%Y.%m.%d %H.%M'))
