@@ -15,3 +15,10 @@ class ModelsStore(object):
         key.set_contents_from_filename(model)
         latest_key.set_contents_from_filename(model)
         s3.close()
+
+    def get_latest_model(self,name):
+        s3 = boto.connect_s3()
+        bucket = s3.get_bucket(self.bucket_name)
+        key = bucket.get_key('{}/{}_latest.h5'.format(self.models_folder,name))
+        key.get_contents_to_filename('{}.h5'.format(name))
+        s3.close()
