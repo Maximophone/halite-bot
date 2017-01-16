@@ -20,11 +20,6 @@ def get_centroid_1D(X,L):
     n = len(X)
     mu_x = 1./n*sum([math.cos(x/float(L)*2*math.pi) for x in X])
     mu_y = 1./n*sum([math.sin(x/float(L)*2*math.pi) for x in X])
-    if mu_x == 0:
-        if mu_y > 0:
-            return math.pi/2.
-        else:
-            return -math.pi/2.
     return int(round(L/math.pi/2.*math.atan2(mu_y,mu_x)%L))
 
 def get_centroid(frame):
