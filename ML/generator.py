@@ -64,7 +64,7 @@ def get_chunks(total,max_replays):
 
     return chunks
 
-def main(replays_folder, output_folder, player, max_replays):
+def main(replays_folder, output_folder, player, max_replays, double_input, prev_frame):
 
     if replays_folder[-1] == '/':
         replays_folder = replays_folder[:-1]
@@ -80,8 +80,8 @@ def main(replays_folder, output_folder, player, max_replays):
 
     progbar = ProgressBar(n_replays)
 
-    print('SELECTING')
-    print('Loading')
+    print('Selecting winning replays')
+    
     selected = []
 
     for replay_name in replay_files:
@@ -107,7 +107,11 @@ def main(replays_folder, output_folder, player, max_replays):
 
     np.random.shuffle(selected)
 
+    print("Computing chunk sizes")
+
     chunks = get_chunks(len(selected),max_replays)
+
+    print("Chunk sizes will be: {}".format(', '.join([str(chunk) for chunk in chunks])))
 
     print('Processing replays')
 
@@ -121,8 +125,20 @@ def main(replays_folder, output_folder, player, max_replays):
         training_input = []
         training_target = []
 
+        if double_input:
+            training_input_alt = []
+
+        if prev_frame:
+            training_input_prev = []
+
         test_input = []
         test_target = []
+
+        if double_input:
+            test_input_alt = []
+
+        if prev_frame:
+            test_input_prev = []
 
         for i,replay_name in enumerate(selected[cursor:cursor+chunk]):
 
@@ -140,8 +156,8 @@ def main(replays_folder, output_folder, player, max_replays):
             filtered_moves = np.where(is_player[:-1],moves,np.zeros_like(moves))
             categorical_moves = (np.arange(5) == filtered_moves[:,:,:,None]).astype(int)
             
-            wrapped_frames = np.empty(shape=(frames.shape[0],input_shape[0],input_shape[1],frames.shape[3]))
-            wrapped_moves = np.empty(shape=(categorical_moves.shape[0],input_shape[0],input_shape[1],categorical_moves.shape[3]))
+            # wrapped_frames = np.empty(shape=(frames.shape[0],input_shape[0],input_shape[1],frames.shape[3]))
+            # wrapped_moves = np.empty(shape=(categorical_moves.shape[0],input_shape[0],input_shape[1],categorical_moves.shape[3]))
 
             iframes = np.empty(shape=frames.shape[:3]+(4,))
 
@@ -150,14 +166,31 @@ def main(replays_folder, output_folder, player, max_replays):
             iframes[:,:,:,2] = frames[:,:,:,1]/20.
             iframes[:,:,:,3] = frames[:,:,:,2]/255.
 
-            for frame,move in zip(iframes,categorical_moves):
-                centroid = get_centroid(frame)
-                wframe = center_frame(frame,centroid,wrap_size=input_shape)
+            for j,(iframe,move) in enumerate(zip(iframes,categorical_moves)):
+                centroid = get_centroid(iframe)
+                wframe = center_frame(iframe,centroid,wrap_size=input_shape)
                 wmoves = center_frame(move,centroid,wrap_size=input_shape)
+
+                if double_input:
+                    prev_move = categorical_moves[j-1] if j>0 else move
+                    wprev_move = center_frame(prev_move,centroid,wrap_size=input_shape)
+
+                if prev_frame:
+                    prev_iframe = iframes[j-1] if j>0 else iframe
+                    wprev_iframe = center_frame(prev_iframe,centroid,wrap_size=input_shape)
+
                 if is_training:
+                    if double_input:
+                        training_input_alt.append(wprev_move)
+                    if prev_frame:
+                        training_input_prev.append(wprev_iframe)
                     training_input.append(wframe)
                     training_target.append(wmoves)
                 else:
+                    if double_input:
+                        test_input_alt.append(wprev_move)
+                    if prev_frame:
+                        test_input_prev.append(wprev_iframe)
                     test_input.append(wframe)
                     test_target.append(wmoves)
 
@@ -167,6 +200,14 @@ def main(replays_folder, output_folder, player, max_replays):
         np.save("{}/training_target_{}.npy".format(out_dir,i_chunk),training_target)
         np.save("{}/test_input_{}.npy".format(out_dir,i_chunk),test_input)
         np.save("{}/test_target_{}.npy".format(out_dir,i_chunk),test_target)
+
+        if double_input:
+            np.save("{}/training_input_alt_{}.npy".format(out_dir,i_chunk),training_input_alt)
+            np.save("{}/test_input_alt_{}.npy".format(out_dir,i_chunk),test_input_alt)
+
+        if prev_frame:
+            np.save("{}/training_input_prev_{}.npy".format(out_dir,i_chunk),training_input_prev)
+            np.save("{}/test_input_prev_{}.npy".format(out_dir,i_chunk),test_input_prev)
 
         cursor += chunk
 
@@ -178,6 +219,8 @@ if __name__ == '__main__':
     parser.add_argument('output', type=str, help="Output Folder")
     parser.add_argument('player', type=str, help="Player to copy")
     parser.add_argument('-m','--max_replays', type=int, default=200, help="Maximum number of replays per chunk")
+    parser.add_argument('-di','--double_input', action="store_true", help="Use previous moves as additional input")
+    parser.add_argument('-pf','--prev_frame', action="store_true", help="Store previous frames as additional input")
     args = parser.parse_args()
 
-    main(args.replays, args.output, args.player, args.max_replays)
+    main(args.replays, args.output, args.player, args.max_replays, args.double_input, args.prev_frame)
