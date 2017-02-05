@@ -18,6 +18,7 @@ from mlutils import get_frames,center_frame,get_centroid_1D,get_centroid
 if not hasattr(tf,'merge_all_summaries'):
     tf.merge_all_summaries = tf.summary.merge_all
     tf.train.SummaryWriter = tf.summary.FileWriter
+    tf.histogram_summary = tf.summary.histogram
 
 import argparse
 
@@ -115,14 +116,17 @@ def diag2(arr):
 
 transforms = [identity,rot1,rot2,rot3,flip1,diag1,flip2,diag2]
 
-def transform_input(frames, directions):
-    it= np.random.randint(8)
+def transform_input(frames, directions, prev_moves=None):
+    it = np.random.randint(8)
     new_frames = np.array([transforms[it](frame) for frame in frames])
     new_directions = np.array([dir_transforms[it](dirmap) for dirmap in directions])
-    return new_frames, new_directions
+    if prev_moves is not None:
+        new_prev_moves = np.array([dir_transforms[it](prev_move) for prev_move in prev_moves])
+        return [new_frames, new_prev_moves], new_directions
+    else:
+        return new_frames, new_directions
 
-
-def get_data_generator(training_input, training_target, batch_size):
+def get_data_generator(training_input, training_target, batch_size, training_input_alt=None):
     cursor = 0
     L = len(training_input)
     perm = np.arange(L)
@@ -131,14 +135,23 @@ def get_data_generator(training_input, training_target, batch_size):
             np.random.shuffle(perm)
             training_input[:] = training_input[perm]
             training_target[:] = training_target[perm]
+            if training_input_alt is not None:
+                training_input_alt[:] = training_input_alt[perm]
             cursor = 0
-        yield transform_input(training_input[cursor:cursor+batch_size],training_target[cursor:cursor+batch_size])
+        yield transform_input(
+            training_input[cursor:cursor+batch_size],
+            training_target[cursor:cursor+batch_size],
+            training_input_alt[cursor:cursor+batch_size] if training_input_alt is not None else None
+            )
         cursor += batch_size
 
 
-def main(model_file,replays,output_model, batch_size, replays_chunk, patience):
+def main(model_file,replays,output_model, batch_size, replays_chunk, patience, log_dir, double_input):
 
-    np.random.seed(0)
+    if replays[-1]=='/': 
+        replays = replays[:-1]
+
+    np.random.seed(876864)
 
     print('Loading...')
 
@@ -147,6 +160,10 @@ def main(model_file,replays,output_model, batch_size, replays_chunk, patience):
     test_input = np.load('{}/test_input_{}.npy'.format(replays,replays_chunk))
     test_target = np.load('{}/test_target_{}.npy'.format(replays,replays_chunk))
 
+    if double_input:
+        training_input_alt = np.load('{}/training_input_alt_{}.npy'.format(replays,replays_chunk))
+        test_input_alt = np.load('{}/test_input_alt_{}.npy'.format(replays,replays_chunk))
+
     print('Features Loaded')
 
     model = load_model(model_file)
@@ -154,21 +171,24 @@ def main(model_file,replays,output_model, batch_size, replays_chunk, patience):
     print('Model Loaded')
 
     now = datetime.datetime.now()
-    tensorboard = TensorBoard(log_dir='./logs/'+now.strftime('%Y.%m.%d %H.%M'))
+    logname = '{}_{}_rc{}_{}'.format(model_file.split('/')[-1],replays.split('/')[-1],replays_chunk,now.strftime('%Y.%m.%d %H.%M'))
+    tensorboard = TensorBoard(log_dir='./{}/{}'.format(log_dir,logname))
 
-    data_generator = get_data_generator(training_input, training_target, batch_size)
+    if double_input:
+        data_generator = get_data_generator(training_input, training_target, batch_size, training_input_alt=training_input_alt)
+    else:
+        data_generator = get_data_generator(training_input, training_target, batch_size)
 
     model.fit_generator(
         data_generator,
         samples_per_epoch=len(training_input),
-        validation_data=(test_input,test_target),
+        validation_data=(test_input,test_target) if not double_input else ([test_input,test_input_alt], test_target),
         callbacks=[
             EarlyStopping(patience=patience),
-            ModelCheckpoint(model_file,verbose=1,save_best_only=True),
+            ModelCheckpoint(output_model,verbose=1,save_best_only=True),
             tensorboard],
             nb_epoch=10000
         )
-
 
 
 if __name__ == '__main__':
@@ -179,6 +199,8 @@ if __name__ == '__main__':
     parser.add_argument('-o','--output')
     parser.add_argument('-bs','--batch_size',type=int,default=256)
     parser.add_argument('-p','--patience',type=int,default=500)
+    parser.add_argument('-lg','--log_dir',type=str,default='logs')
+    parser.add_argument('-di','--double_input', action="store_true", help="Use previous moves as additional input")
 
     args = parser.parse_args()
 
@@ -188,6 +210,8 @@ if __name__ == '__main__':
         args.output if args.output else args.model, 
         args.batch_size, 
         args.replays_chunk,
-        args.patience
+        args.patience,
+        args.log_dir,
+        args.double_input
         )
 
