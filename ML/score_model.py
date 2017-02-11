@@ -46,7 +46,7 @@ def main(model_url, replays, replays_chunk, test_only, double_input):
 
 
         if not test_only:
-            training_inputs = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'training_input' in fname and 'alt' not in fname]
+            training_inputs = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'training_input' in fname and 'alt' not in fname and 'prev' not in fname]
             training_targets = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'training_target' in fname]
 
             training_input = np.concatenate(training_inputs)
@@ -56,7 +56,7 @@ def main(model_url, replays, replays_chunk, test_only, double_input):
                 training_inputs_alt = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'training_input_alt' in fname]
                 training_input_alt = np.concatenate(training_inputs_alt)
 
-        test_inputs = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'test_input' in fname and 'alt' not in fname]
+        test_inputs = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'test_input' in fname and 'alt' not in fname and 'prev' not in fname]
         test_targets = [np.load('{}/{}'.format(replays,fname)) for fname in all_files if 'test_target' in fname]
 
         test_input = np.concatenate(test_inputs)
